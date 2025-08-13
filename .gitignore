@@ -1,1 +1,26 @@
-/target
+# Rust/Cargo
+debug/
+target/
+**/*.rs.bk
+
+# IDE/Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# By-products
+Cargo.lock
+*.dSYM/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Misc
+.DS_Store
+*.db
+*.db-journal
