@@ -38,6 +38,7 @@ impl AccountDao for AccountDaoImpl {
                 FROM accounts AS T1
                 INNER JOIN account_types AS T2
                     ON T1.account_type_id = T2.id
+                ORDER BY T1.name ASC
                 "#,
             )
             .fetch_all(pool)
@@ -71,6 +72,7 @@ impl AccountDao for AccountDaoImpl {
                 INNER JOIN account_types AS T2
                     ON T1.account_type_id = T2.id
                 WHERE T2.type_name = ?
+                ORDER BY T1.name ASC
                 "#,
                 account_type_name
             )
@@ -262,12 +264,16 @@ fn convert_iter_to_accounts(rows: Vec<AccountRow>) -> Vec<Account> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sqlx::{SqlitePool, Executor};
+    use sqlx::{SqlitePool, sqlite::SqlitePoolOptions, Executor};
     use uuid::Uuid;
     use tokio::time::{sleep, Duration};
     // テスト用のインメモリSQLiteデータベースをセットアップするヘルパー関数
     async fn create_test_db() -> SqlitePool {
-        let pool = SqlitePool::connect(":memory:").await.unwrap();
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("file:memdb1?mode=memory&cache=shared")
+            .await
+            .unwrap();
         pool.execute(
             r#"
             CREATE TABLE account_types (
@@ -279,19 +285,10 @@ mod tests {
                 name TEXT NOT NULL,
                 account_type_id INTEGER NOT NULL,
                 memo TEXT,
-                created_at TEXT,
-                updated_at TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(account_type_id) REFERENCES account_types(id)
             );
-            CREATE TRIGGER insert_accounts_timestamps
-            AFTER INSERT ON accounts
-            FOR EACH ROW
-            BEGIN
-                UPDATE accounts
-                SET created_at = CURRENT_TIMESTAMP,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = NEW.id;
-            END;
             CREATE TRIGGER update_accounts_updated_at
             AFTER UPDATE ON accounts
             FOR EACH ROW

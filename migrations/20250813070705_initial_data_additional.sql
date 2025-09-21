@@ -1,5 +1,7 @@
 -- 口座のタイプ初期データ
-INSERT INTO account_types (id, type_name) VALUES
+INSERT INTO
+    account_types (id, type_name)
+VALUES
     (1, '現金'),
     (2, '銀行口座(普通)'),
     (3, '銀行口座(定期)'),
@@ -13,7 +15,9 @@ INSERT INTO account_types (id, type_name) VALUES
     (99, 'その他');
 
 -- 出納タイプ初期データ
-INSERT INTO entry_types (id, type_name) VALUES
+INSERT INTO
+    entry_types (id, type_name)
+VALUES
     (1, '入金'),
     (2, '出金'),
     (3, 'クレジットカード払い(一括)'),
@@ -23,12 +27,16 @@ INSERT INTO entry_types (id, type_name) VALUES
     (99, 'その他');
 
 -- クレジットカード分割払いステータス初期データ
-INSERT INTO credit_card_installment_status (id, status) VALUES
+INSERT INTO
+    credit_card_installment_status (id, status)
+VALUES
     (1, '支払い開始前'),
     (2, '支払い中'),
     (3, '支払い完了');
 
 -- クレジットカードリボ払いステータス初期データ
-INSERT INTO credit_card_revolving_status (id, status) VALUES
+INSERT INTO
+    credit_card_revolving_status (id, status)
+VALUES
     (1, '締日前'),
     (2, '締日後');
