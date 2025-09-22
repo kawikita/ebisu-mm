@@ -269,33 +269,36 @@ mod tests {
     use tokio::time::{sleep, Duration};
     // テスト用のインメモリSQLiteデータベースをセットアップするヘルパー関数
     async fn create_test_db() -> SqlitePool {
+        let db_name = format!("file:memdb-{}", Uuid::new_v4().to_string());
+        let db_url= format!("{}?mode=memory&cache=shared", db_name);
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
-            .connect("file:memdb1?mode=memory&cache=shared")
+            .connect(&db_url)
             .await
             .unwrap();
         pool.execute(
             r#"
-            CREATE TABLE account_types (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type_name TEXT NOT NULL UNIQUE
+            CREATE TABLE IF NOT EXISTS account_types (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, -- タイプのユニークな識別子
+                type_name TEXT NOT NULL UNIQUE -- タイプ名（例: 普通預金, 定期預金, クレジットカード）
             );
-            CREATE TABLE accounts (
-                id TEXT PRIMARY KEY NOT NULL,
-                name TEXT NOT NULL,
-                account_type_id INTEGER NOT NULL,
-                memo TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(account_type_id) REFERENCES account_types(id)
+            CREATE TABLE IF NOT EXISTS accounts (
+                id TEXT PRIMARY KEY NOT NULL, -- 口座のユニークな識別子(UUID)
+                name TEXT NOT NULL, -- 口座名（例: ゆうちょ銀行、楽天カード）
+                account_type_id INTEGER NOT NULL, -- 口座のタイプのID
+                memo TEXT, -- 口座に関する追加のメモ
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP, -- 作成日時
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP, -- 更新日時
+                FOREIGN KEY (account_type_id) REFERENCES account_types (id)
             );
-            CREATE TRIGGER update_accounts_updated_at
-            AFTER UPDATE ON accounts
-            FOR EACH ROW
-            BEGIN
-                UPDATE accounts
-                SET updated_at = CURRENT_TIMESTAMP
-                WHERE id = NEW.id;
+            CREATE TRIGGER update_accounts_updated_at AFTER
+            UPDATE ON accounts FOR EACH ROW BEGIN
+            UPDATE accounts
+            SET
+                updated_at = CURRENT_TIMESTAMP
+            WHERE
+                id = NEW.id;
+
             END;
             "#
         ).await.unwrap();
@@ -412,8 +415,8 @@ mod tests {
             let accounts = dao.get_accounts_list_all(&pool).await.unwrap();
             // assertion
             assert_eq!(accounts.len(), 2);
-            assert_eq!(accounts[0].id, saving_account.id);
-            assert_eq!(accounts[1].id, fixed_term_account.id);
+            assert_eq!(accounts[0].id, fixed_term_account.id);
+            assert_eq!(accounts[1].id, saving_account.id);
         }
     }
 
@@ -464,6 +467,7 @@ mod tests {
             assert_eq!(filtered.len(), 2);
             assert_eq!(filtered[0].account_type.name, account_type_name);
             assert_eq!(filtered[1].account_type.name, account_type_name);
+            assert_ne!(filtered[0].id, filtered[1].id);
         }
     }
 
