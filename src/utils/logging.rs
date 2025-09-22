@@ -43,7 +43,7 @@ fn open_log_file(path: &str) -> Target {
     // ログファイルを開く
     match OpenOptions::new().create(true).append(true).open(log_path) {
         Ok(file) => {
-            info!("Logging to file: {}", path);
+            eprintln!("Logging to file: {}", path);
             Target::Pipe(Box::new(file))
         }
         Err(e) => {
