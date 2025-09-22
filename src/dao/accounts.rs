@@ -118,7 +118,7 @@ impl AccountDao for AccountDaoImpl {
             )
             .fetch_optional(pool)
             .await?;
-            info!("Fetched account: {}(id)", id);
+            info!("Fetched account with ID: {}", id);
             Ok(account_row.map(|row| convert_row_to_object(&row)))
         }
     }
