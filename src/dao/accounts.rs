@@ -14,6 +14,7 @@ pub trait AccountDao {
 }
 
 /// AccountDaoトレイトの実装。
+#[derive(Clone)]
 pub struct AccountDaoImpl;
 impl AccountDao for AccountDaoImpl {
     /// すべての口座情報を取得する。

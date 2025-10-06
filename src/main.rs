@@ -1,38 +1,22 @@
 // Ebisu backend
 // Copyright (c) 2025 Samurai QA Laboratory
-use actix_web::{web, App, HttpServer, HttpResponse, Responder};
-use dotenv::dotenv;
-use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
-use std::env;
-use log::info;
+// This software is released under the MIT License.
 
-struct AppState {
-    db: SqlitePool,
-}
+use dotenv::dotenv;
+use ebisu_api::utils::{app_setup, logging};
+use log::info;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok();
-    ebisu_api::utils::logging::init_logger();
+    logging::init_logger();
+    info!("Welcome to Ebisu API!");
     info!("Starting Ebisu API server...");
-
-    let database_url: String = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let pool = SqlitePoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await
-        .expect("Failed to create database connectionpool");
-
-    HttpServer::new(move || {
-        App::new()
-            .app_data(web::Data::new(AppState { db: pool.clone() }))
-            .route("/", web::get().to(index))
-    })
-    .bind("127.0.0.1:8080")?
-    .run()
-    .await
-}
-
-async fn index() -> impl Responder {
-    HttpResponse::Ok().body("Welcome to Ebisu API!")
+    let pool = app_setup::get_db_pool().await;
+    let app_data = app_setup::create_app_data(&pool);
+    let server = app_setup::get_server(app_data).await;
+    info!("Server is running. Press Ctrl+C to stop.");
+    let result = server.await;
+    info!("Ebisu API server stopped.");
+    result
 }
