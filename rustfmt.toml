@@ -1,0 +1,10 @@
+chain_indent = "Block"
+chain_width = 120
+enum_discrim_align_threshold = 20
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
+match_block_trailing_comma = true
+max_width = 120
+struct_field_align_threshold = 20
+trailing_comma = "Always"
+use_small_heuristics = "Max"
