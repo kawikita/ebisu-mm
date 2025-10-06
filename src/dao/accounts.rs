@@ -1,15 +1,34 @@
 use crate::model::accounts::{Account, AccountType};
-use sqlx::{FromRow, Result, SqlitePool};
 use log::{debug, info};
+use sqlx::{FromRow, Result, SqlitePool};
 
 /// 口座情報に関するデータアクセスオブジェクト(DAO)のトレイト定義。
 #[trait_async::trait_async]
 pub trait AccountDao {
-    fn get_accounts_list_all(&self, pool: &SqlitePool) -> impl std::future::Future<Output = Result<Vec<Account>>> + Send;
-    fn get_accounts_list_by_type(&self, pool: &SqlitePool, account_type_name: &str) -> impl std::future::Future<Output = Result<Vec<Account>>> + Send;
-    fn get_account_by_id(&self, pool: &SqlitePool, id: &str) -> impl std::future::Future<Output = Result<Option<Account>>> + Send;
-    fn create_account(&self, pool: &SqlitePool, account: &Account) -> impl std::future::Future<Output = Result<u64>> + Send;
-    fn update_account(&self, pool: &SqlitePool, account: &Account) -> impl std::future::Future<Output = Result<u64>> + Send;
+    fn get_accounts_list_all(
+        &self,
+        pool: &SqlitePool,
+    ) -> impl std::future::Future<Output = Result<Vec<Account>>> + Send;
+    fn get_accounts_list_by_type(
+        &self,
+        pool: &SqlitePool,
+        account_type_name: &str,
+    ) -> impl std::future::Future<Output = Result<Vec<Account>>> + Send;
+    fn get_account_by_id(
+        &self,
+        pool: &SqlitePool,
+        id: &str,
+    ) -> impl std::future::Future<Output = Result<Option<Account>>> + Send;
+    fn create_account(
+        &self,
+        pool: &SqlitePool,
+        account: &Account,
+    ) -> impl std::future::Future<Output = Result<u64>> + Send;
+    fn update_account(
+        &self,
+        pool: &SqlitePool,
+        account: &Account,
+    ) -> impl std::future::Future<Output = Result<u64>> + Send;
     fn delete_account(&self, pool: &SqlitePool, id: &str) -> impl std::future::Future<Output = Result<u64>> + Send;
 }
 
@@ -24,7 +43,10 @@ impl AccountDao for AccountDaoImpl {
     ///
     /// # 戻り値
     /// * `Result<Vec<Account>>` - すべての口座情報のリスト。DBエラー時はErr。
-    fn get_accounts_list_all(&self, pool: &SqlitePool) -> impl std::future::Future<Output = Result<Vec<Account>>> + Send {
+    fn get_accounts_list_all(
+        &self,
+        pool: &SqlitePool,
+    ) -> impl std::future::Future<Output = Result<Vec<Account>>> + Send {
         async move {
             info!("Fetching all accounts from database");
             let accounts_rows = sqlx::query_as!(
@@ -59,7 +81,11 @@ impl AccountDao for AccountDaoImpl {
     ///
     /// # 戻り値
     /// * `Result<Vec<Account>>` - 該当する口座情報のリスト。DBエラー時はErr。
-    fn get_accounts_list_by_type(&self, pool: &SqlitePool, account_type_name: &str) -> impl std::future::Future<Output = Result<Vec<Account>>> + Send {
+    fn get_accounts_list_by_type(
+        &self,
+        pool: &SqlitePool,
+        account_type_name: &str,
+    ) -> impl std::future::Future<Output = Result<Vec<Account>>> + Send {
         async move {
             info!("Fetching accounts with type '{}' from database", account_type_name);
             let accounts_rows = sqlx::query_as!(
@@ -96,7 +122,11 @@ impl AccountDao for AccountDaoImpl {
     ///
     /// # 戻り値
     /// * `Result<Option<Account>>` - 該当口座があればSome(Account)、なければNone。DBエラー時はErr。
-    fn get_account_by_id(&self, pool: &SqlitePool, id: &str) -> impl std::future::Future<Output = Result<Option<Account>>> + Send {
+    fn get_account_by_id(
+        &self,
+        pool: &SqlitePool,
+        id: &str,
+    ) -> impl std::future::Future<Output = Result<Option<Account>>> + Send {
         async move {
             info!("Fetching account with ID '{}' from database", id);
             let account_row = sqlx::query_as!(
@@ -132,7 +162,11 @@ impl AccountDao for AccountDaoImpl {
     ///
     /// # 戻り値
     /// * `Result<u64>` - 追加されたレコード数（通常は1）。DBエラー時はErr。
-    fn create_account(&self, pool: &SqlitePool, account: &Account) -> impl std::future::Future<Output = Result<u64>> + Send {
+    fn create_account(
+        &self,
+        pool: &SqlitePool,
+        account: &Account,
+    ) -> impl std::future::Future<Output = Result<u64>> + Send {
         async move {
             info!("Creating new account: {:?}", account);
             let result = sqlx::query!(
@@ -160,7 +194,11 @@ impl AccountDao for AccountDaoImpl {
     ///
     /// # 戻り値
     /// * `Result<u64>` - 更新されたレコード数（通常は1）。DBエラー時はErr。
-    fn update_account(&self, pool: &SqlitePool, account: &Account) -> impl std::future::Future<Output = Result<u64>> + Send {
+    fn update_account(
+        &self,
+        pool: &SqlitePool,
+        account: &Account,
+    ) -> impl std::future::Future<Output = Result<u64>> + Send {
         async move {
             info!("Updating account: {:?}", account);
             let account_row = convert_object_to_row(account);
@@ -198,7 +236,7 @@ impl AccountDao for AccountDaoImpl {
                 DELETE FROM accounts
                 WHERE id = ?
                 "#,
-            id
+                id
             )
             .execute(pool)
             .await?;
@@ -234,13 +272,10 @@ fn convert_row_to_object(row: &AccountRow) -> Account {
     Account {
         id: row.id.clone(),
         name: row.name.clone(),
-        account_type: AccountType {
-            id: row.account_type_id,
-            name: row.account_type_name.clone(),
-        },
+        account_type: AccountType { id: row.account_type_id, name: row.account_type_name.clone() },
         memo: row.memo.clone(),
         created_at: row.created_at.clone(),
-        updated_at: row.updated_at.clone()
+        updated_at: row.updated_at.clone(),
     }
 }
 
@@ -260,7 +295,7 @@ fn convert_object_to_row(account: &Account) -> AccountRow {
         account_type_name: account.account_type.name.clone(),
         memo: account.memo.clone(),
         created_at: account.created_at.clone(),
-        updated_at: account.updated_at.clone()
+        updated_at: account.updated_at.clone(),
     }
 }
 
@@ -273,26 +308,20 @@ fn convert_object_to_row(account: &Account) -> AccountRow {
 /// * `Vec<Account>` - 変換後のAccount構造体のベクタ
 fn convert_iter_to_accounts(rows: Vec<AccountRow>) -> Vec<Account> {
     debug!("Converting Vec<AccountRow> to Vec<Account>: {} rows", rows.len());
-    rows.into_iter()
-        .map(|row| convert_row_to_object(&row))
-        .collect()
+    rows.into_iter().map(|row| convert_row_to_object(&row)).collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sqlx::{SqlitePool, sqlite::SqlitePoolOptions, Executor};
+    use sqlx::{Executor, SqlitePool, sqlite::SqlitePoolOptions};
+    use tokio::time::{Duration, sleep};
     use uuid::Uuid;
-    use tokio::time::{sleep, Duration};
     // テスト用のインメモリSQLiteデータベースをセットアップするヘルパー関数
     async fn create_test_db() -> SqlitePool {
         let db_name = format!("file:memdb-{}", Uuid::new_v4().to_string());
-        let db_url= format!("{}?mode=memory&cache=shared", db_name);
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect(&db_url)
-            .await
-            .unwrap();
+        let db_url = format!("{}?mode=memory&cache=shared", db_name);
+        let pool = SqlitePoolOptions::new().max_connections(1).connect(&db_url).await.unwrap();
         pool.execute(
             r#"
             CREATE TABLE IF NOT EXISTS account_types (
@@ -317,20 +346,16 @@ mod tests {
                 id = NEW.id;
 
             END;
-            "#
-        ).await.unwrap();
+            "#,
+        )
+        .await
+        .unwrap();
         insert_test_types(&pool).await;
         pool
     }
     // テスト用に口座種別を追加するヘルパー関数
     async fn insert_account_type(pool: &SqlitePool, type_name: &str) {
-        sqlx::query!(
-            "INSERT INTO account_types (type_name) VALUES (?1)",
-            type_name
-        )
-        .execute(pool)
-        .await
-        .unwrap();
+        sqlx::query!("INSERT INTO account_types (type_name) VALUES (?1)", type_name).execute(pool).await.unwrap();
     }
     // テスト用に口座情報を追加するヘルパー関数
     async fn insert_account(pool: &SqlitePool, account_row: &AccountRow) {
