@@ -1,7 +1,7 @@
-use env_logger::{Builder, Target};
-use log::{info, LevelFilter};
-use std::{env, io::Write, fs::OpenOptions, path::Path};
 use chrono;
+use env_logger::{Builder, Target};
+use log::debug;
+use std::{env, fs::OpenOptions, io::Write, path::Path};
 
 /// ロガーの初期化
 /// ログファイルのパスは環境変数 LOG_FILE_PATH で指定
@@ -12,22 +12,22 @@ pub fn init_logger() {
     set_log_message_format(&mut builder);
     builder.target(open_log_file(&log_file_path));
     builder.init();
-    info!("Logger initialized");
+    debug!("Logger initialized. Log file path: {}", log_file_path);
 }
 
 // ログメッセージのフォーマットを設定するヘルパー関数
 fn set_log_message_format(builder: &mut Builder) {
-    builder.filter_level(LevelFilter::Debug)
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "[{}][{}] {} - {}",
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.9f"),
-                record.level(),
-                record.module_path().unwrap_or("<unknown>"),
-                record.args()
-            )
-        });
+    builder.format(|buf, record| {
+        writeln!(
+            buf,
+            "[{}][{}] {} @{} - {}",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f"),
+            record.level(),
+            record.module_path().unwrap_or("<unknown>"),
+            record.line().unwrap_or(0),
+            record.args()
+        )
+    });
 }
 
 // ログファイルを開くヘルパー関数
@@ -45,10 +45,10 @@ fn open_log_file(path: &str) -> Target {
         Ok(file) => {
             eprintln!("Logging to file: {}", path);
             Target::Pipe(Box::new(file))
-        }
+        },
         Err(e) => {
             eprintln!("Warning: Failed to open log file at {}: {}", path, e);
             Target::Stderr
-        }
+        },
     }
 }
