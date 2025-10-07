@@ -1,5 +1,5 @@
 apt-get update
-apt-get install -y git curl build-essential ca-certificates
+apt-get install -y git curl build-essential ca-certificates pkg-config libssl-dev
 apt-get autoremove -y
 apt-get clean
 

@@ -19,6 +19,9 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4.42" }
 url = { version = "2"}
 
+[dev-dependencies]
+sqlx-cli = { version = "0.8" }
+
 [lib]
 name = "ebisu_api"
 path = "src/lib.rs"
