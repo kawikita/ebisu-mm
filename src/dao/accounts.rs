@@ -314,106 +314,10 @@ fn convert_iter_to_accounts(rows: Vec<AccountRow>) -> Vec<Account> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sqlx::{Executor, SqlitePool, sqlite::SqlitePoolOptions};
+    use crate::utils::unit_test::fixtures::accounts as fixtures_accounts;
+    use crate::utils::unit_test::fixtures::db as fixtures_db;
     use tokio::time::{Duration, sleep};
     use uuid::Uuid;
-    // テスト用のインメモリSQLiteデータベースをセットアップするヘルパー関数
-    async fn create_test_db() -> SqlitePool {
-        let db_name = format!("file:memdb-{}", Uuid::new_v4().to_string());
-        let db_url = format!("{}?mode=memory&cache=shared", db_name);
-        let pool = SqlitePoolOptions::new().max_connections(1).connect(&db_url).await.unwrap();
-        pool.execute(
-            r#"
-            CREATE TABLE IF NOT EXISTS account_types (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, -- タイプのユニークな識別子
-                type_name TEXT NOT NULL UNIQUE -- タイプ名（例: 普通預金, 定期預金, クレジットカード）
-            );
-            CREATE TABLE IF NOT EXISTS accounts (
-                id TEXT PRIMARY KEY NOT NULL, -- 口座のユニークな識別子(UUID)
-                name TEXT NOT NULL, -- 口座名（例: ゆうちょ銀行、楽天カード）
-                account_type_id INTEGER NOT NULL, -- 口座のタイプのID
-                memo TEXT, -- 口座に関する追加のメモ
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP, -- 作成日時
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP, -- 更新日時
-                FOREIGN KEY (account_type_id) REFERENCES account_types (id)
-            );
-            CREATE TRIGGER update_accounts_updated_at AFTER
-            UPDATE ON accounts FOR EACH ROW BEGIN
-            UPDATE accounts
-            SET
-                updated_at = CURRENT_TIMESTAMP
-            WHERE
-                id = NEW.id;
-
-            END;
-            "#,
-        )
-        .await
-        .unwrap();
-        insert_test_types(&pool).await;
-        pool
-    }
-    // テスト用に口座種別を追加するヘルパー関数
-    async fn insert_account_type(pool: &SqlitePool, type_name: &str) {
-        sqlx::query!("INSERT INTO account_types (type_name) VALUES (?1)", type_name).execute(pool).await.unwrap();
-    }
-    // テスト用に口座情報を追加するヘルパー関数
-    async fn insert_account(pool: &SqlitePool, account_row: &AccountRow) {
-        sqlx::query!(
-            "INSERT INTO accounts
-             (id, name, account_type_id, memo) VALUES (?1, ?2, ?3, ?4)",
-            account_row.id,
-            account_row.name,
-            account_row.account_type_id,
-            account_row.memo,
-        )
-        .execute(pool)
-        .await
-        .unwrap();
-    }
-    // テスト用口座種別を挿入するヘルパー関数
-    async fn insert_test_types(pool: &SqlitePool) {
-        let _ = insert_account_type(pool, "現金").await;
-        let _ = insert_account_type(pool, "銀行口座(普通)").await;
-        let _ = insert_account_type(pool, "銀行口座(定期)").await;
-        let _ = insert_account_type(pool, "銀行口座(当座)").await;
-    }
-    // 普通口座のアカウント
-    fn saving_account() -> AccountRow {
-        AccountRow {
-            id: Uuid::new_v4().to_string(),
-            name: "テスト口座(普通)".to_string(),
-            account_type_id: 2,
-            account_type_name: "銀行口座(普通)".to_string(),
-            memo: Some("テスト用の口座(普通)です".to_string()),
-            created_at: None,
-            updated_at: None,
-        }
-    }
-    // 定期口座のアカウント
-    fn fixed_term_account() -> AccountRow {
-        AccountRow {
-            id: Uuid::new_v4().to_string(),
-            name: "テスト口座(定期)".to_string(),
-            account_type_id: 3,
-            account_type_name: "銀行口座(定期)".to_string(),
-            memo: Some("テスト用の口座(定期)です".to_string()),
-            created_at: None,
-            updated_at: None,
-        }
-    }
-    // 当座口座のアカウント
-    fn checking_account() -> AccountRow {
-        AccountRow {
-            id: Uuid::new_v4().to_string(),
-            name: "テスト口座(当座)".to_string(),
-            account_type_id: 4,
-            account_type_name: "銀行口座(当座)".to_string(),
-            memo: Some("テスト用の口座(当座)です".to_string()),
-            created_at: None,
-            updated_at: None,
-        }
-    }
 
     // get_accounts_list_allのテスト
     mod get_accounts_list_all {
@@ -422,7 +326,7 @@ mod tests {
         #[tokio::test]
         async fn account_in_empty() {
             // preparation
-            let pool = create_test_db().await;
+            let pool = fixtures_db::create_test_db().await;
             // execution
             let dao = AccountDaoImpl;
             let accounts = dao.get_accounts_list_all(&pool).await.unwrap();
@@ -433,32 +337,31 @@ mod tests {
         #[tokio::test]
         async fn account_in_one() {
             // preparation
-            let saving_account = saving_account();
-            let pool = create_test_db().await;
-            insert_account(&pool, &saving_account).await;
+            let pool = fixtures_db::create_test_db().await;
+            let first_account = fixtures_accounts::get_sorted_account_list().pop().unwrap();
+            fixtures_accounts::insert_account(&pool, &first_account).await;
             // execution
             let dao = AccountDaoImpl;
             let accounts = dao.get_accounts_list_all(&pool).await.unwrap();
             // assertion
             assert_eq!(accounts.len(), 1);
-            assert_eq!(accounts[0].id, saving_account.id);
+            assert_eq!(accounts[0].id, first_account.id);
         }
         // 口座が複数件ある場合
         #[tokio::test]
-        async fn account_in_two() {
+        async fn account_in_three() {
             // preparation
-            let saving_account = saving_account();
-            let fixed_term_account = fixed_term_account();
-            let pool = create_test_db().await;
-            insert_account(&pool, &saving_account).await;
-            insert_account(&pool, &fixed_term_account).await;
+            let pool = fixtures_db::create_test_db().await;
+            fixtures_accounts::insert_test_account(&pool).await;
+            let account_list = fixtures_accounts::get_sorted_account_list();
             // execution
             let dao = AccountDaoImpl;
             let accounts = dao.get_accounts_list_all(&pool).await.unwrap();
             // assertion
-            assert_eq!(accounts.len(), 2);
-            assert_eq!(accounts[0].id, fixed_term_account.id);
-            assert_eq!(accounts[1].id, saving_account.id);
+            assert_eq!(accounts.len(), 3);
+            assert_eq!(accounts[0].id, account_list[0].id);
+            assert_eq!(accounts[1].id, account_list[1].id);
+            assert_eq!(accounts[2].id, account_list[2].id);
         }
     }
 
@@ -469,7 +372,8 @@ mod tests {
         #[tokio::test]
         async fn not_found_account_type() {
             // preparation
-            let pool = create_test_db().await;
+            let pool = fixtures_db::create_test_db().await;
+            fixtures_accounts::insert_test_account(&pool).await;
             // execution
             let dao = AccountDaoImpl;
             let filtered = dao.get_accounts_list_by_type(&pool, "存在しない口座タイプ").await.unwrap();
@@ -480,11 +384,9 @@ mod tests {
         #[tokio::test]
         async fn found_one_saving_account() {
             // preparation
+            let pool = fixtures_db::create_test_db().await;
+            fixtures_accounts::insert_test_account(&pool).await;
             let account_type_name = "銀行口座(普通)".to_string();
-            let pool = create_test_db().await;
-            insert_account(&pool, &saving_account()).await;
-            insert_account(&pool, &fixed_term_account()).await;
-            insert_account(&pool, &checking_account()).await;
             // execution
             let dao = AccountDaoImpl;
             let filtered = dao.get_accounts_list_by_type(&pool, &account_type_name).await.unwrap();
@@ -496,12 +398,11 @@ mod tests {
         #[tokio::test]
         async fn found_two_saving_accounts() {
             // preparation
+            let pool = fixtures_db::create_test_db().await;
+            fixtures_accounts::insert_test_account(&pool).await;
+            let adding_account = fixtures_accounts::create_new_account();
+            fixtures_accounts::insert_account(&pool, &adding_account).await;
             let account_type_name = "銀行口座(普通)".to_string();
-            let pool = create_test_db().await;
-            insert_account(&pool, &saving_account()).await;
-            insert_account(&pool, &fixed_term_account()).await;
-            insert_account(&pool, &checking_account()).await;
-            insert_account(&pool, &saving_account()).await;
             // execution
             let dao = AccountDaoImpl;
             let filtered = dao.get_accounts_list_by_type(&pool, &account_type_name).await.unwrap();
@@ -520,14 +421,12 @@ mod tests {
         #[tokio::test]
         async fn not_found_account() {
             // preparation
-            let id = Uuid::new_v4().to_string();
-            let pool = create_test_db().await;
-            insert_account(&pool, &saving_account()).await;
-            insert_account(&pool, &fixed_term_account()).await;
-            insert_account(&pool, &checking_account()).await;
+            let pool = fixtures_db::create_test_db().await;
+            fixtures_accounts::insert_test_account(&pool).await;
+            let search_id = Uuid::new_v4().to_string();
             // execution
             let dao = AccountDaoImpl;
-            let fetched = dao.get_account_by_id(&pool, &id).await.unwrap();
+            let fetched = dao.get_account_by_id(&pool, &search_id).await.unwrap();
             // assertion
             assert!(fetched.is_none());
         }
@@ -535,21 +434,19 @@ mod tests {
         #[tokio::test]
         async fn found_account_by_id() {
             // preparation
-            let saving_account = saving_account();
-            let pool = create_test_db().await;
-            insert_account(&pool, &saving_account).await;
-            insert_account(&pool, &fixed_term_account()).await;
-            insert_account(&pool, &checking_account()).await;
+            let pool = fixtures_db::create_test_db().await;
+            fixtures_accounts::insert_test_account(&pool).await;
+            let first_account = fixtures_accounts::get_sorted_account_list().pop().unwrap();
             // execution
             let dao = AccountDaoImpl;
-            let fetched = dao.get_account_by_id(&pool, &saving_account.id).await.unwrap();
+            let fetched = dao.get_account_by_id(&pool, &first_account.id).await.unwrap();
             // assertion
             assert!(fetched.is_some());
             let fetched = fetched.unwrap();
-            assert_eq!(fetched.id, saving_account.id);
-            assert_eq!(fetched.name, saving_account.name);
-            assert_eq!(fetched.account_type.id, saving_account.account_type_id);
-            assert_eq!(fetched.memo, saving_account.memo);
+            assert_eq!(fetched.id, first_account.id);
+            assert_eq!(fetched.name, first_account.name);
+            assert_eq!(fetched.account_type.id, first_account.account_type.id);
+            assert_eq!(fetched.memo, first_account.memo);
         }
     }
 
@@ -560,18 +457,18 @@ mod tests {
         #[tokio::test]
         async fn create_account() {
             // preparation
-            let pool = create_test_db().await;
+            let pool = fixtures_db::create_test_db().await;
+            let adding_account = fixtures_accounts::create_new_account();
             // execution
             let dao = AccountDaoImpl;
-            let saving_account = saving_account();
-            let result = dao.create_account(&pool, &convert_row_to_object(&saving_account)).await.unwrap();
+            let result = dao.create_account(&pool, &adding_account).await.unwrap();
             // assertion
             assert_eq!(result, 1);
-            let fetched = dao.get_account_by_id(&pool, &saving_account.id).await.unwrap().unwrap();
-            assert_eq!(fetched.id, saving_account.id);
-            assert_eq!(fetched.name, saving_account.name);
-            assert_eq!(fetched.account_type.id, saving_account.account_type_id);
-            assert_eq!(fetched.memo, saving_account.memo);
+            let fetched = dao.get_account_by_id(&pool, &adding_account.id).await.unwrap().unwrap();
+            assert_eq!(fetched.id, adding_account.id);
+            assert_eq!(fetched.name, adding_account.name);
+            assert_eq!(fetched.account_type.id, adding_account.account_type.id);
+            assert_eq!(fetched.memo, adding_account.memo);
             assert!(!fetched.created_at.is_none());
             assert!(!fetched.updated_at.is_none());
         }
@@ -584,31 +481,29 @@ mod tests {
         #[tokio::test]
         async fn updates_account() {
             // preparation
-            let before_account = saving_account();
-            let pool = create_test_db().await;
-            insert_account(&pool, &before_account).await;
-            let dao = AccountDaoImpl;
-            let before_fetched = dao.get_account_by_id(&pool, &before_account.id).await.unwrap().unwrap();
-            let mut updated_account = convert_object_to_row(&before_fetched);
-            updated_account.name = "更新後の口座名".to_string();
-            updated_account.account_type_id = 3; // 銀行口座(定期)
-            updated_account.account_type_name = "銀行口座(定期)".to_string();
+            let pool = fixtures_db::create_test_db().await;
+            fixtures_accounts::insert_test_account(&pool).await;
+            let before_account = fixtures_accounts::get_sorted_account_list().pop().unwrap();
+            let dao: AccountDaoImpl = AccountDaoImpl;
+            let before = dao.get_account_by_id(&pool, &before_account.id).await.unwrap().unwrap();
+            let mut updated_account = convert_object_to_row(&before);
             updated_account.memo = Some("更新後のメモ".to_string());
-            let before_updated_at = before_fetched.updated_at.clone();
+            let before_updated_at = before.updated_at.clone();
             sleep(Duration::from_secs(1)).await; // updated_atの差分を確実にするため、1秒待機
             // execution
+            let dao = AccountDaoImpl;
             let updated = dao.update_account(&pool, &convert_row_to_object(&updated_account)).await.unwrap();
             // assertion
             assert_eq!(updated, 1);
-            let fetched = dao.get_account_by_id(&pool, &updated_account.id).await.unwrap().unwrap();
-            assert_eq!(fetched.id, updated_account.id);
-            assert_eq!(fetched.name, updated_account.name);
-            assert_eq!(fetched.account_type.id, updated_account.account_type_id);
-            assert_eq!(fetched.memo, updated_account.memo);
-            assert!(!fetched.created_at.is_none());
-            assert!(!fetched.updated_at.is_none());
-            assert_ne!(fetched.updated_at, before_updated_at);
-            assert_ne!(fetched.created_at, fetched.updated_at);
+            let after = dao.get_account_by_id(&pool, &updated_account.id).await.unwrap().unwrap();
+            assert_eq!(after.id, updated_account.id);
+            assert_eq!(after.name, updated_account.name);
+            assert_eq!(after.account_type.id, updated_account.account_type_id);
+            assert_eq!(after.memo, updated_account.memo);
+            assert!(!after.created_at.is_none());
+            assert!(!after.updated_at.is_none());
+            assert_ne!(after.updated_at, before_updated_at);
+            assert_ne!(after.created_at, after.updated_at);
         }
     }
 
@@ -619,17 +514,15 @@ mod tests {
         #[tokio::test]
         async fn deletes_account() {
             // preparation
-            let saving_account = saving_account();
-            let pool = create_test_db().await;
-            insert_account(&pool, &saving_account).await;
-            insert_account(&pool, &fixed_term_account()).await;
-            insert_account(&pool, &checking_account()).await;
+            let pool = fixtures_db::create_test_db().await;
+            fixtures_accounts::insert_test_account(&pool).await;
+            let delete_account = fixtures_accounts::get_sorted_account_list().pop().unwrap();
             // execution
             let dao = AccountDaoImpl;
-            let deleted = dao.delete_account(&pool, &saving_account.id).await.unwrap();
+            let deleted = dao.delete_account(&pool, &delete_account.id).await.unwrap();
             // assertion
             assert_eq!(deleted, 1);
-            let fetched = dao.get_account_by_id(&pool, &saving_account.id).await.unwrap();
+            let fetched = dao.get_account_by_id(&pool, &delete_account.id).await.unwrap();
             assert!(fetched.is_none());
         }
     }
