@@ -71,6 +71,10 @@ pub fn get_sorted_account_list() -> Vec<Account> {
     accounts
 }
 
+pub fn get_first_account() -> Account {
+    get_sorted_account_list().first().unwrap().clone()
+}
+
 pub fn create_new_account() -> Account {
     Account {
         id: "44444444-4444-4444-4444-444444444444".to_string(),
