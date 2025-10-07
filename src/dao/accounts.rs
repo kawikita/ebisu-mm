@@ -338,7 +338,7 @@ mod tests {
         async fn account_in_one() {
             // preparation
             let pool = fixtures_db::create_test_db().await;
-            let first_account = fixtures_accounts::get_sorted_account_list().pop().unwrap();
+            let first_account = fixtures_accounts::get_first_account();
             fixtures_accounts::insert_account(&pool, &first_account).await;
             // execution
             let dao = AccountDaoImpl;
@@ -436,7 +436,7 @@ mod tests {
             // preparation
             let pool = fixtures_db::create_test_db().await;
             fixtures_accounts::insert_test_account(&pool).await;
-            let first_account = fixtures_accounts::get_sorted_account_list().pop().unwrap();
+            let first_account = fixtures_accounts::get_first_account();
             // execution
             let dao = AccountDaoImpl;
             let fetched = dao.get_account_by_id(&pool, &first_account.id).await.unwrap();
@@ -483,15 +483,14 @@ mod tests {
             // preparation
             let pool = fixtures_db::create_test_db().await;
             fixtures_accounts::insert_test_account(&pool).await;
-            let before_account = fixtures_accounts::get_sorted_account_list().pop().unwrap();
-            let dao: AccountDaoImpl = AccountDaoImpl;
+            let before_account = fixtures_accounts::get_first_account();
+            let dao = AccountDaoImpl;
             let before = dao.get_account_by_id(&pool, &before_account.id).await.unwrap().unwrap();
             let mut updated_account = convert_object_to_row(&before);
             updated_account.memo = Some("更新後のメモ".to_string());
             let before_updated_at = before.updated_at.clone();
             sleep(Duration::from_secs(1)).await; // updated_atの差分を確実にするため、1秒待機
             // execution
-            let dao = AccountDaoImpl;
             let updated = dao.update_account(&pool, &convert_row_to_object(&updated_account)).await.unwrap();
             // assertion
             assert_eq!(updated, 1);
@@ -516,7 +515,7 @@ mod tests {
             // preparation
             let pool = fixtures_db::create_test_db().await;
             fixtures_accounts::insert_test_account(&pool).await;
-            let delete_account = fixtures_accounts::get_sorted_account_list().pop().unwrap();
+            let delete_account = fixtures_accounts::get_first_account();
             // execution
             let dao = AccountDaoImpl;
             let deleted = dao.delete_account(&pool, &delete_account.id).await.unwrap();
