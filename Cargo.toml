@@ -4,21 +4,20 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-async-trait = { version = "0.1" }
-log = { version = "0.4" }
-env_logger = { version = "0.11" }
 actix-rt = { version = "2"}
 actix-web = { version = "4", features = ["macros"] }
-trait-async = { version = "0.1" }
+async-trait = { version = "0.1" }
+chrono = { version = "0.4.42" }
+dotenv = { version = "0.15" }
+env_logger = { version = "0.11" }
+log = { version = "0.4" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
 serde_yaml = { version = "0.9" }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
 tokio = { version = "1", features = ["full"] }
-dotenv = { version = "0.15" }
-uuid = { version = "1.0", features = ["v4", "serde"] }
-chrono = { version = "0.4.42" }
 url = { version = "2"}
+uuid = { version = "1.0", features = ["v4", "serde"] }
 
 [dev-dependencies]
 sqlx-cli = { version = "0.8" }
