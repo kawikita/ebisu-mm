@@ -1,4 +1,4 @@
-use crate::model::accounts::{Account, AccountType};
+use crate::entity::accounts::{Account, AccountType};
 use log::{debug, info};
 use sqlx::{FromRow, Result, SqlitePool};
 

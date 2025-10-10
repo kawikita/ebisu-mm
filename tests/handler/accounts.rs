@@ -6,7 +6,7 @@ use actix_web::{App, test, web};
 use ebisu_api::dao::accounts::AccountDaoImpl;
 use ebisu_api::handler::accounts::AccountHandlerImpl;
 use ebisu_api::handler::accounts::set_route as accounts_configure;
-use ebisu_api::model::accounts::Account;
+use ebisu_api::entity::accounts::Account;
 use serde_json::json;
 use sqlx::{Pool, Sqlite};
 use std::vec;

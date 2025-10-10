@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::model::accounts::{Account, AccountType};
+use crate::entity::accounts::{Account, AccountType};
 use serde::Deserialize;
 use sqlx::SqlitePool;
 use std::fs;
