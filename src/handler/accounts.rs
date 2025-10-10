@@ -1,5 +1,5 @@
 use crate::dao::accounts::{AccountDao, AccountDaoImpl};
-use crate::model::accounts::Account;
+use crate::entity::accounts::Account;
 use actix_web::{HttpResponse, Result, web};
 use log::{error, info};
 use serde_json::json;

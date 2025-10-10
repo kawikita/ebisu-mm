@@ -1,4 +1,4 @@
-use ebisu_api::model::accounts::{Account, AccountType};
+use ebisu_api::entity::accounts::{Account, AccountType};
 use serde::Deserialize;
 use sqlx::SqlitePool;
 use std::fs;
