@@ -4,6 +4,7 @@ use std::fs;
 use uuid::Uuid;
 
 const MIGRATIONS_DIR: &str = "./migrations";
+const UNDEFINED_DB: &str = "./undefined.db";
 
 // テスト用のインメモリSQLiteデータベースをセットアップするヘルパー関数
 pub async fn create_test_db() -> SqlitePool {
@@ -26,5 +27,13 @@ pub async fn create_test_db() -> SqlitePool {
             .await
             .unwrap_or_else(|e| panic!("Failed to execute migration: {}: {}", path.display(), e));
     }
+    pool
+}
+
+// スキーマが設定されていないDBへのアクセスプールを作成する
+pub async fn create_undefined_db() -> SqlitePool {
+    fs::OpenOptions::new().write(true).create(true).open(UNDEFINED_DB).expect("Failed to create undefined.db file");
+    let db_url = format!("sqlite:{}", UNDEFINED_DB);
+    let pool = SqlitePoolOptions::new().connect(&db_url).await.unwrap();
     pool
 }

@@ -1,4 +1,5 @@
 use crate::dao::accounts::AccountDaoImpl;
+use crate::handler::accounts;
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 use log::{debug, info};
 use serde_json::json;
@@ -22,9 +23,11 @@ pub fn create_app_data(pool: &SqlitePool) -> AppData {
     AppData { db_pool: pool.clone(), account_dao: AccountDaoImpl }
 }
 
-/// 各ハンドラーのconfigure関数をまとめて返す関数
+/// 各APIのルーティング設定をする関数
 fn set_route_config(cfg: &mut web::ServiceConfig) {
     debug!("Setting up route configurations.");
+    accounts::set_route(cfg);
+    debug!("Route configurations set up successfully.");
 }
 
 /// Actix Webアプリケーションのファクトリ関数
