@@ -272,7 +272,10 @@ fn convert_row_to_object(row: &AccountRow) -> Account {
     Account {
         id: row.id.clone(),
         name: row.name.clone(),
-        account_type: AccountType { id: row.account_type_id, name: row.account_type_name.clone() },
+        account_type: AccountType {
+            id: row.account_type_id,
+            name: row.account_type_name.clone(),
+        },
         memo: row.memo.clone(),
         created_at: row.created_at.clone(),
         updated_at: row.updated_at.clone(),

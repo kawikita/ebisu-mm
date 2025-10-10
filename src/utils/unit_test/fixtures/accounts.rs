@@ -51,7 +51,10 @@ pub fn load_accounts_from_yaml() -> Vec<Account> {
         .map(|ya| Account {
             id: ya.id,
             name: ya.name,
-            account_type: AccountType { id: ya.account_type.id, name: ya.account_type.name },
+            account_type: AccountType {
+                id: ya.account_type.id,
+                name: ya.account_type.name,
+            },
             memo: ya.memo,
             created_at: None,
             updated_at: None,
@@ -79,7 +82,10 @@ pub fn create_new_account() -> Account {
     Account {
         id: "44444444-4444-4444-4444-444444444444".to_string(),
         name: "追加の普通口座".to_string(),
-        account_type: AccountType { id: 2, name: "銀行口座(普通)".to_string() },
+        account_type: AccountType {
+            id: 2,
+            name: "銀行口座(普通)".to_string(),
+        },
         memo: Some("追加の普通口座のメモ".to_string()),
         created_at: None,
         updated_at: None,
