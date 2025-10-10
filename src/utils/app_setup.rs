@@ -20,7 +20,10 @@ pub struct AppData {
 
 /// DAOのインスタンスを作成してAppDataにセットする関数
 pub fn create_app_data(pool: &SqlitePool) -> AppData {
-    AppData { db_pool: pool.clone(), account_dao: AccountDaoImpl }
+    AppData {
+        db_pool: pool.clone(),
+        account_dao: AccountDaoImpl,
+    }
 }
 
 /// 各APIのルーティング設定をする関数
