@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 /// 口座種別を表す構造体。
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, FromRow, PartialEq, Eq, Clone)]
 pub struct AccountType {
     pub id: i64,
     pub name: String,
