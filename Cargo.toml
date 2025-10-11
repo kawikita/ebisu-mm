@@ -3,6 +3,10 @@ name = "ebisu_api"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "ebisu_api"
+path = "src/lib.rs"
+
 [dependencies]
 actix-rt = { version = "2"}
 actix-web = { version = "4", features = ["macros"] }
@@ -11,17 +15,19 @@ chrono = { version = "0.4.42" }
 dotenv = { version = "0.15" }
 env_logger = { version = "0.11" }
 log = { version = "0.4" }
+once_cell = { version = "1.21.3" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
 serde_yaml = { version = "0.9" }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+strfmt = { version = "0.2.5" }
 tokio = { version = "1", features = ["full"] }
-url = { version = "2"}
+url = { version = "2" }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
 [dev-dependencies]
 sqlx-cli = { version = "0.8" }
 
-[lib]
-name = "ebisu_api"
-path = "src/lib.rs"
+[build-dependencies]
+glob = { version = "0.3.3" }
+serde_yaml = { version = "0.9" }
