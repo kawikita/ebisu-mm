@@ -4,7 +4,6 @@ use serde_yaml::Value;
 use std::collections::HashMap;
 use strfmt::strfmt;
 
-
 // --- バイナリ埋め込み ---
 // build.rsで生成したRust静的変数をinclude!で取り込む
 include!(concat!(env!("OUT_DIR"), "/messages_embedded.rs"));
@@ -56,7 +55,10 @@ pub fn set_hierarchy(module_path: &str) -> MessageHierarchy<'_> {
     for part in module_path.split("::") {
         match node.get(part) {
             Some(next) => node = next,
-            None => panic!("Message YAML for module_path '{}' not found (missing part '{}')", module_path, part),
+            None => panic!(
+                "Message YAML for module_path '{}' not found (missing part '{}'). Ensure the corresponding YAML file or section exists. See the documentation for message configuration.",
+                module_path, part
+            ),
         }
     }
     MessageHierarchy { node }
