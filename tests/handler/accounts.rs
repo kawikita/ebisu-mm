@@ -246,8 +246,6 @@ mod delete_account {
         let resp = call_api(&pool, HttpMethod::DELETE, &api_path, None).await;
         // assertion
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
-        let body: serde_json::Value = test::read_body_json(resp).await;
-        assert_eq!(body, json!({"message": "Account deleted successfully."}));
     }
 
     #[actix_web::test]

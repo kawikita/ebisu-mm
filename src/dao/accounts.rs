@@ -47,7 +47,7 @@ impl AccountDao for AccountDaoImpl {
         )
         .fetch_all(pool)
         .await?;
-        info!("Fetched {} accounts", accounts_rows.len());
+        info!("Fetched {} accounts.", accounts_rows.len());
         Ok(convert_iter_to_accounts(accounts_rows))
     }
 
@@ -82,7 +82,7 @@ impl AccountDao for AccountDaoImpl {
         )
         .fetch_all(pool)
         .await?;
-        info!("Fetched {} accounts with type '{}'", accounts_rows.len(), account_type_name);
+        info!("Fetched {} accounts with account type ID: {}.", accounts_rows.len(), account_type_name);
         Ok(convert_iter_to_accounts(accounts_rows))
     }
 
@@ -116,7 +116,7 @@ impl AccountDao for AccountDaoImpl {
         )
         .fetch_optional(pool)
         .await?;
-        info!("Fetched account with ID: {}", id);
+        info!("Fetched account with ID: {}.", id);
         Ok(account_row.map(|row| convert_row_to_object(&row)))
     }
 
@@ -142,7 +142,7 @@ impl AccountDao for AccountDaoImpl {
         )
         .execute(pool)
         .await?;
-        info!("Created account with ID: {}", account.id);
+        info!("Created account with ID: {}.", account.id);
         Ok(result.rows_affected())
     }
 
@@ -170,7 +170,7 @@ impl AccountDao for AccountDaoImpl {
         )
         .execute(pool)
         .await?;
-        info!("Updated account with ID: {}", account.id);
+        info!("Updated account with ID: {}.", account.id);
         Ok(result.rows_affected())
     }
 
@@ -193,7 +193,7 @@ impl AccountDao for AccountDaoImpl {
         )
         .execute(pool)
         .await?;
-        info!("Deleted account with ID: {}", id);
+        info!("Deleted account with ID: {}.", id);
         Ok(result.rows_affected())
     }
 }
