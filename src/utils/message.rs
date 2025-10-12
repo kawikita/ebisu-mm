@@ -4,9 +4,10 @@ use serde_yaml::Value;
 use std::collections::HashMap;
 use strfmt::strfmt;
 
+
 // --- バイナリ埋め込み ---
-// messages.yamlをinclude_str!で埋め込む例（本来はbuild.rs等でマージする想定）
-const MESSAGES_YAML: &str = include_str!(concat!(env!("OUT_DIR"), "/messages_gen.yaml"));
+// build.rsで生成したRust静的変数をinclude!で取り込む
+include!(concat!(env!("OUT_DIR"), "/messages_embedded.rs"));
 
 static MESSAGES: OnceCell<Value> = OnceCell::new();
 

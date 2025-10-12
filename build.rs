@@ -7,7 +7,7 @@ use serde_yaml::{Mapping, Value};
 
 fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
-    let dest_path = Path::new(&out_dir).join("messages_gen.yaml");
+    let dest_path = Path::new(&out_dir).join("messages_embedded.rs");
 
     let mut root = Mapping::new();
 
@@ -22,7 +22,8 @@ fn main() {
     let yaml_str = serde_yaml::to_string(&merged).unwrap();
 
     let mut f = File::create(&dest_path).unwrap();
-    f.write_all(yaml_str.as_bytes()).unwrap();
+    // Rustの静的変数として埋め込む
+    writeln!(f, "pub const MESSAGES_YAML: &str = r#\"{}\"#;", yaml_str).unwrap();
 
     println!("cargo:rerun-if-changed=messages/");
 }

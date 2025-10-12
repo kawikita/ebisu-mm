@@ -189,7 +189,7 @@ impl AccountHandler for AccountHandlerImpl {
                     return Ok(HttpResponse::NotFound().json(json!({"error": msg.get("account_not_found")})));
                 }
                 info!("Deleted account with ID: {}", account_id);
-                Ok(HttpResponse::NoContent().into())
+                Ok(HttpResponse::NoContent().finish())
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
