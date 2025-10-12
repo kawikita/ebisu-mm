@@ -24,30 +24,24 @@ pub struct MessageHierarchy<'a> {
 
 impl<'a> MessageHierarchy<'a> {
     /// メッセージを取得。未定義時は空文字列＋エラーログ
-    pub fn get(&self, key: &str) -> Option<&'a str> {
-        match self.node.get(key)?.as_str() {
-            Some(s) => Some(s),
+    pub fn get(&self, key: &str) -> &str {
+        match self.node.get(key).and_then(|v| v.as_str()) {
+            Some(s) => s,
             None => {
                 error!("Message key '{}' found but not a string", key);
-                Some("")
+                ""
             },
         }
     }
 
     /// テンプレート文字列にstrfmtで埋め込み。失敗時は空文字＋エラーログ
-    pub fn get_fmt(&self, key: &str, vars: &HashMap<String, String>) -> Option<String> {
-        let template = match self.get(key) {
-            Some(t) if !t.is_empty() => t,
-            _ => {
-                error!("Message key '{}' not found", key);
-                return Some(String::new());
-            },
-        };
+    pub fn get_fmt(&self, key: &str, vars: &HashMap<String, String>) -> String {
+        let template = self.get(key);
         match strfmt(template, vars) {
-            Ok(s) => Some(s),
+            Ok(s) => s,
             Err(e) => {
                 error!("Failed to format message for key '{}': {}", key, e);
-                Some(String::new())
+                "".to_string()
             },
         }
     }
@@ -65,6 +59,15 @@ pub fn set_hierarchy(module_path: &str) -> MessageHierarchy<'_> {
         }
     }
     MessageHierarchy { node }
+}
+
+#[macro_export]
+macro_rules! msg_map {
+    ( $( $k:expr => $v:expr ),* $(,)? ) => {{
+        let mut m = std::collections::HashMap::new();
+        $( m.insert($k.to_string(), $v.to_string()); )*
+        m
+    }};
 }
 
 #[cfg(test)]
@@ -86,7 +89,7 @@ mod tests {
     #[test]
     fn test_get() {
         let h: MessageHierarchy<'_> = set_hierarchy("common::test");
-        assert_eq!(h.get("simple"), Some("Hello, world!"));
+        assert_eq!(h.get("simple"), "Hello, world!");
     }
 
     #[test]
@@ -95,6 +98,6 @@ mod tests {
         let mut vars = std::collections::HashMap::new();
         vars.insert("name".to_string(), "Taro".to_string());
         let s = h.get_fmt("greet", &vars);
-        assert_eq!(s, Some("Hello, Taro!".to_string()));
+        assert_eq!(s, "Hello, Taro!".to_string());
     }
 }

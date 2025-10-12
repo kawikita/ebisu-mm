@@ -30,20 +30,26 @@
     - 理由: メッセージ出力に支障が出るため、初期不良を早期発見する。
 
 ## メッセージ取得API
-- メッセージを取得する:
-    - 例:
-      ```rust
-      let s = msg.get("fetched_n_accounts").unwrap_or("");
-      ```
 
-- メッセージ取得時に引数（名前付き）をHashMapで渡し、フォーマット済み文字列を取得する:
+- メッセージを取得する:
         - 例:
             ```rust
-            let mut vars = std::collections::HashMap::new();
-            vars.insert("count".to_string(), "10".to_string());
-            let s = msg.get_fmt("fetched_n_accounts", &vars).unwrap_or("");
+            let s = msg.get("fetched_n_accounts");
             ```
+
+- メッセージ取得時に引数（名前付き）をmsg_map!マクロで渡し、フォーマット済み文字列を取得する:
+        - 例:
+            ```rust
+            let s = msg.get_fmt("fetched_n_accounts", &msg_map!("count" => 10));
+            let s = msg.get_fmt("fetch_n_accounts_with_type_id", &msg_map!("count" => 10, "account_type_id" => "bank"));
+            ```
+        - プレースホルダは必ず `{name}` のような「名前付き」とし、msg_map!マクロで複数ペアを簡潔に渡せる。
         - 引数は可変長で、DBの値など動的なものも許容（コンパイル時に決まっている必要はない）。
+
+### msg_map!マクロについて
+- 使い方: `msg_map!("key1" => val1, "key2" => val2, ...)`
+- すべての値はto_string()でString化されるため、数値や&strもそのまま渡せる
+- 複数ペアを一度に指定でき、どのモジュールからも呼び出し可能
 
 ## メッセージのバイナリ埋め込み
 - YAMLファイルのメッセージはコンパイル時にバイナリに埋め込む。
