@@ -1,10 +1,12 @@
 use crate::dao::accounts::{AccountDao, AccountDaoImpl};
 use crate::entity::accounts::Account;
+use crate::utils::message::set_hierarchy;
 use actix_web::{HttpResponse, Result, web};
 use log::{error, info};
 use serde_json::json;
 use sqlx::SqlitePool;
 
+const MODULE_PATH: &str = module_path!();
 const API_BASE_PATH: &str = "/api/account";
 
 /// APIのルーティング設定
@@ -131,6 +133,7 @@ impl AccountHandler for AccountHandlerImpl {
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to create a new account");
+        let msg = set_hierarchy(MODULE_PATH);
         let account_id = data.id.clone();
         // IDの重複チェック
         let result = dao.get_account_by_id(&pool, &account_id).await;
@@ -138,12 +141,14 @@ impl AccountHandler for AccountHandlerImpl {
             Ok(account) => {
                 if account.is_some() {
                     info!("Account with ID {} already exists.", account_id);
-                    return Ok(HttpResponse::Conflict().json(json!({"error": "Account ID already exists."})));
+                    return Ok(HttpResponse::Conflict().json(json!({"error": msg.get("account_id_already_exists")})));
                 }
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                return Ok(HttpResponse::InternalServerError().json(json!({"error": "Failed to fetch account."})));
+                return Ok(
+                    HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_fetch_account")}))
+                );
             },
         }
         // 口座の作成
@@ -155,7 +160,7 @@ impl AccountHandler for AccountHandlerImpl {
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": "Failed to create account."})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_create_account")})))
             },
         }
     }
@@ -175,19 +180,20 @@ impl AccountHandler for AccountHandlerImpl {
     ) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to delete account by ID: {}", account_id);
+        let msg = set_hierarchy(MODULE_PATH);
         let result = dao.delete_account(&pool, account_id).await;
         match result {
             Ok(del_count) => {
                 if del_count == 0 {
                     info!("No account found with ID: {}", account_id);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": "Account not found."})));
+                    return Ok(HttpResponse::NotFound().json(json!({"error": msg.get("account_not_found")})));
                 }
                 info!("Deleted account with ID: {}", account_id);
-                Ok(HttpResponse::NoContent().json(json!({"message": "Account deleted successfully."})))
+                Ok(HttpResponse::NoContent().into())
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": "Failed to delete account."})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_delete_account")})))
             },
         }
     }
@@ -207,19 +213,20 @@ impl AccountHandler for AccountHandlerImpl {
     ) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to fetch account by ID: {}", account_id);
+        let msg = set_hierarchy(MODULE_PATH);
         let result = dao.get_account_by_id(&pool, account_id).await;
         match result {
             Ok(account) => {
                 if account.is_none() {
                     info!("No account found with ID: {}", account_id);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": "Account not found."})));
+                    return Ok(HttpResponse::NotFound().json(json!({"error": msg.get("account_not_found")})));
                 }
                 info!("Fetched account with ID: {}", account_id);
                 Ok(HttpResponse::Ok().json(account))
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": "Failed to fetch account."})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_fetch_account")})))
             },
         }
     }
@@ -236,6 +243,7 @@ impl AccountHandler for AccountHandlerImpl {
         dao: web::Data<AccountDaoImpl>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to fetch all accounts");
+        let msg = set_hierarchy(MODULE_PATH);
         let result = dao.get_accounts_list_all(&pool).await;
         match result {
             Ok(accounts) => {
@@ -244,7 +252,7 @@ impl AccountHandler for AccountHandlerImpl {
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": "Failed to fetch accounts."})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_fetch_accounts")})))
             },
         }
     }
@@ -264,19 +272,20 @@ impl AccountHandler for AccountHandlerImpl {
     ) -> Result<HttpResponse, actix_web::Error> {
         let type_name = path.as_str();
         info!("Received request to fetch accounts of type: {}", type_name);
+        let msg = set_hierarchy(MODULE_PATH);
         let result = dao.get_accounts_list_by_type(&pool, type_name).await;
         match result {
             Ok(accounts) => {
                 if accounts.is_empty() {
                     info!("No accounts found for type: {}", type_name);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": "No accounts found."})));
+                    return Ok(HttpResponse::NotFound().json(json!({"error": msg.get("no_accounts_found")})));
                 }
                 info!("Fetched {} accounts of type: {}", accounts.len(), type_name);
                 Ok(HttpResponse::Ok().json(accounts))
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": "Failed to fetch accounts."})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_fetch_accounts")})))
             },
         }
     }
@@ -295,19 +304,20 @@ impl AccountHandler for AccountHandlerImpl {
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to update account by ID: {}", data.id);
+        let msg = set_hierarchy(MODULE_PATH);
         let result = dao.update_account(&pool, &data).await;
         match result {
             Ok(updated_count) => {
                 if updated_count == 0 {
                     info!("No account found with ID: {}", data.id);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": "Account not found."})));
+                    return Ok(HttpResponse::NotFound().json(json!({"error": msg.get("account_not_found")})));
                 }
                 info!("Updated account with ID: {}", data.id);
                 Ok(HttpResponse::Ok().json(json!({"updated": updated_count})))
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": "Failed to update account."})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_update_account")})))
             },
         }
     }
@@ -580,9 +590,6 @@ mod tests {
             let resp = handler.delete_account(pool, dao, path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::NO_CONTENT);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"message": "Account deleted successfully."}));
         }
 
         #[actix_web::test]
