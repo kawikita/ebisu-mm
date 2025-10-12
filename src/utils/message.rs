@@ -28,7 +28,7 @@ impl<'a> MessageHierarchy<'a> {
         match self.node.get(key).and_then(|v| v.as_str()) {
             Some(s) => s,
             None => {
-                error!("Message key '{}' found but not a string", key);
+                error!("Message key '{}' not found or not a string value", key);
                 ""
             },
         }
