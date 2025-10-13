@@ -1,13 +1,15 @@
 use crate::dao::accounts::{AccountDao, AccountDaoImpl};
 use crate::entity::accounts::Account;
-use crate::utils::message::set_hierarchy;
+use crate::utils::message::{MessageHierarchy, set_hierarchy};
 use actix_web::{HttpResponse, Result, web};
 use log::{error, info};
+use once_cell::sync::Lazy;
 use serde_json::json;
 use sqlx::SqlitePool;
 
 const MODULE_PATH: &str = module_path!();
 const API_BASE_PATH: &str = "/api/account";
+static MESSAGE: Lazy<MessageHierarchy<'static>> = Lazy::new(|| set_hierarchy(MODULE_PATH));
 
 /// APIのルーティング設定
 /// # 引数
@@ -19,58 +21,113 @@ pub fn set_route(cfg: &mut web::ServiceConfig) {
         web::scope(API_BASE_PATH)
             .service(
                 web::resource("")
-                    .route(web::get().to(
-                        |handler: web::Data<AccountHandlerImpl>,
-                         pool: web::Data<SqlitePool>,
-                         dao: web::Data<AccountDaoImpl>| async move {
-                            handler.get_accounts_list_all(pool, dao).await
-                        },
-                    ))
-                    .route(web::post().to(
-                        |handler: web::Data<AccountHandlerImpl>,
-                         pool: web::Data<SqlitePool>,
-                         dao: web::Data<AccountDaoImpl>,
-                         data: web::Json<Account>| async move {
-                            handler.create_account(pool, dao, data).await
-                        },
-                    ))
-                    .route(web::put().to(
-                        |handler: web::Data<AccountHandlerImpl>,
-                         pool: web::Data<SqlitePool>,
-                         dao: web::Data<AccountDaoImpl>,
-                         data: web::Json<Account>| async move {
-                            handler.update_account(pool, dao, data).await
-                        },
-                    )),
+                    .route(web::get().to(get_accounts_list_all_handler))
+                    .route(web::post().to(create_account_handler))
+                    .route(web::put().to(update_account_handler)),
             )
             .service(
                 web::resource("/{id}")
-                    .route(web::get().to(
-                        |handler: web::Data<AccountHandlerImpl>,
-                         pool: web::Data<SqlitePool>,
-                         dao: web::Data<AccountDaoImpl>,
-                         path: web::Path<String>| async move {
-                            handler.get_account_by_id(pool, dao, path).await
-                        },
-                    ))
-                    .route(web::delete().to(
-                        |handler: web::Data<AccountHandlerImpl>,
-                         pool: web::Data<SqlitePool>,
-                         dao: web::Data<AccountDaoImpl>,
-                         path: web::Path<String>| async move {
-                            handler.delete_account(pool, dao, path).await
-                        },
-                    )),
+                    .route(web::get().to(get_account_by_id_handler))
+                    .route(web::delete().to(delete_account_handler)),
             )
-            .service(web::resource("/type/{type_name}").route(web::get().to(
-                |handler: web::Data<AccountHandlerImpl>,
-                 pool: web::Data<SqlitePool>,
-                 dao: web::Data<AccountDaoImpl>,
-                 path: web::Path<String>| async move {
-                    handler.get_accounts_list_by_type(pool, dao, path).await
-                },
-            ))),
+            .service(web::resource("/type/{type_name}").route(web::get().to(get_accounts_list_by_type_handler))),
     );
+}
+
+// utoipaのpath登録用のラッパー関数
+
+#[utoipa::path(post, path = "/api/account", tag = "accounts", request_body = Account, responses(
+    (status = 201, description = "Account created successfully", body = serde_json::Value, example = json!({"created": 1})),
+    (status = 409, description = "Account ID already exists", body = serde_json::Value, example = json!({"error": MESSAGE.get("account_id_already_exists")})),
+    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_create_account")})),
+))]
+/// 新しい口座情報を作成するAPI
+pub async fn create_account_handler(
+    handler: web::Data<AccountHandlerImpl>,
+    pool: web::Data<SqlitePool>,
+    dao: web::Data<AccountDaoImpl>,
+    data: web::Json<Account>,
+) -> Result<HttpResponse, actix_web::Error> {
+    handler.create_account(pool, dao, data).await
+}
+
+#[utoipa::path(delete, path = "/api/account/{id}", tag = "accounts", params(
+    ("id" = String, Path, description = "Account ID(UUID)")
+), responses(
+    (status = 204, description = "Account deleted successfully"),
+    (status = 404, description = "Account not found", body = serde_json::Value, example = json!({"error": MESSAGE.get("account_not_found")})),
+    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_delete_account")})),
+))]
+/// 指定されたIDの口座情報を削除するAPI
+pub async fn delete_account_handler(
+    handler: web::Data<AccountHandlerImpl>,
+    pool: web::Data<SqlitePool>,
+    dao: web::Data<AccountDaoImpl>,
+    path: web::Path<String>,
+) -> Result<HttpResponse, actix_web::Error> {
+    handler.delete_account(pool, dao, path).await
+}
+
+#[utoipa::path(get, path = "/api/account/{id}", tag = "accounts", params(
+    ("id" = String, Path, description = "Account ID(UUID)")
+), responses(
+    (status = 200, description = "Account fetched successfully", body = Account),
+    (status = 404, description = "Account not found", body = serde_json::Value, example = json!({"error": MESSAGE.get("account_not_found")})),
+    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_fetch_account")})),
+))]
+/// 指定されたIDの口座情報を取得するAPI
+pub async fn get_account_by_id_handler(
+    handler: web::Data<AccountHandlerImpl>,
+    pool: web::Data<SqlitePool>,
+    dao: web::Data<AccountDaoImpl>,
+    path: web::Path<String>,
+) -> Result<HttpResponse, actix_web::Error> {
+    handler.get_account_by_id(pool, dao, path).await
+}
+
+#[utoipa::path(get, path = "/api/account", tag = "accounts", responses(
+    (status = 200, description = "Accounts fetched successfully", body = [Account]),
+    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_fetch_accounts")}))
+))]
+/// 全ての口座情報を取得するAPI
+pub async fn get_accounts_list_all_handler(
+    handler: web::Data<AccountHandlerImpl>,
+    pool: web::Data<SqlitePool>,
+    dao: web::Data<AccountDaoImpl>,
+) -> Result<HttpResponse, actix_web::Error> {
+    handler.get_accounts_list_all(pool, dao).await
+}
+
+#[utoipa::path(get, path = "/api/account/type/{type_name}", tag = "accounts", params(
+    ("type_name" = String, Path, description = "Account Type Name")
+), responses(
+    (status = 200, description = "Accounts fetched successfully", body = [Account]),
+    (status = 404, description = "No accounts found", body = serde_json::Value, example = json!({"error": MESSAGE.get("no_accounts_found")})),
+    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_fetch_accounts")})),
+))]
+/// 指定された口座種別の口座情報を取得するAPI
+pub async fn get_accounts_list_by_type_handler(
+    handler: web::Data<AccountHandlerImpl>,
+    pool: web::Data<SqlitePool>,
+    dao: web::Data<AccountDaoImpl>,
+    path: web::Path<String>,
+) -> Result<HttpResponse, actix_web::Error> {
+    handler.get_accounts_list_by_type(pool, dao, path).await
+}
+
+#[utoipa::path(put, path = "/api/account", tag = "accounts", request_body = Account, responses(
+    (status = 200, description = "Account updated successfully", body = serde_json::Value, example = json!({"updated": 1})),
+    (status = 404, description = "Account not found", body = serde_json::Value, example = json!({"error": MESSAGE.get("account_not_found")})),
+    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_update_account")})),
+))]
+/// 指定されたIDの口座情報を更新するAPI
+pub async fn update_account_handler(
+    handler: web::Data<AccountHandlerImpl>,
+    pool: web::Data<SqlitePool>,
+    dao: web::Data<AccountDaoImpl>,
+    data: web::Json<Account>,
+) -> Result<HttpResponse, actix_web::Error> {
+    handler.update_account(pool, dao, data).await
 }
 
 // ハンドラートレイト定義（グローバルスコープに移動）
@@ -133,7 +190,6 @@ impl AccountHandler for AccountHandlerImpl {
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to create a new account");
-        let msg = set_hierarchy(MODULE_PATH);
         let account_id = data.id.clone();
         // IDの重複チェック
         let result = dao.get_account_by_id(&pool, &account_id).await;
@@ -141,13 +197,15 @@ impl AccountHandler for AccountHandlerImpl {
             Ok(account) => {
                 if account.is_some() {
                     info!("Account with ID {} already exists.", account_id);
-                    return Ok(HttpResponse::Conflict().json(json!({"error": msg.get("account_id_already_exists")})));
+                    return Ok(
+                        HttpResponse::Conflict().json(json!({"error": MESSAGE.get("account_id_already_exists")}))
+                    );
                 }
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
                 return Ok(
-                    HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_fetch_account")}))
+                    HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_fetch_account")}))
                 );
             },
         }
@@ -160,7 +218,7 @@ impl AccountHandler for AccountHandlerImpl {
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_create_account")})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_create_account")})))
             },
         }
     }
@@ -180,20 +238,19 @@ impl AccountHandler for AccountHandlerImpl {
     ) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to delete account by ID: {}", account_id);
-        let msg = set_hierarchy(MODULE_PATH);
         let result = dao.delete_account(&pool, account_id).await;
         match result {
             Ok(del_count) => {
                 if del_count == 0 {
                     info!("No account found with ID: {}", account_id);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": msg.get("account_not_found")})));
+                    return Ok(HttpResponse::NotFound().json(json!({"error": MESSAGE.get("account_not_found")})));
                 }
                 info!("Deleted account with ID: {}", account_id);
                 Ok(HttpResponse::NoContent().finish())
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_delete_account")})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_delete_account")})))
             },
         }
     }
@@ -213,20 +270,19 @@ impl AccountHandler for AccountHandlerImpl {
     ) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to fetch account by ID: {}", account_id);
-        let msg = set_hierarchy(MODULE_PATH);
         let result = dao.get_account_by_id(&pool, account_id).await;
         match result {
             Ok(account) => {
                 if account.is_none() {
                     info!("No account found with ID: {}", account_id);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": msg.get("account_not_found")})));
+                    return Ok(HttpResponse::NotFound().json(json!({"error": MESSAGE.get("account_not_found")})));
                 }
                 info!("Fetched account with ID: {}", account_id);
                 Ok(HttpResponse::Ok().json(account))
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_fetch_account")})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_fetch_account")})))
             },
         }
     }
@@ -243,7 +299,6 @@ impl AccountHandler for AccountHandlerImpl {
         dao: web::Data<AccountDaoImpl>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to fetch all accounts");
-        let msg = set_hierarchy(MODULE_PATH);
         let result = dao.get_accounts_list_all(&pool).await;
         match result {
             Ok(accounts) => {
@@ -252,7 +307,7 @@ impl AccountHandler for AccountHandlerImpl {
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_fetch_accounts")})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_fetch_accounts")})))
             },
         }
     }
@@ -272,20 +327,19 @@ impl AccountHandler for AccountHandlerImpl {
     ) -> Result<HttpResponse, actix_web::Error> {
         let type_name = path.as_str();
         info!("Received request to fetch accounts of type: {}", type_name);
-        let msg = set_hierarchy(MODULE_PATH);
         let result = dao.get_accounts_list_by_type(&pool, type_name).await;
         match result {
             Ok(accounts) => {
                 if accounts.is_empty() {
                     info!("No accounts found for type: {}", type_name);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": msg.get("no_accounts_found")})));
+                    return Ok(HttpResponse::NotFound().json(json!({"error": MESSAGE.get("no_accounts_found")})));
                 }
                 info!("Fetched {} accounts of type: {}", accounts.len(), type_name);
                 Ok(HttpResponse::Ok().json(accounts))
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_fetch_accounts")})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_fetch_accounts")})))
             },
         }
     }
@@ -304,20 +358,19 @@ impl AccountHandler for AccountHandlerImpl {
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to update account by ID: {}", data.id);
-        let msg = set_hierarchy(MODULE_PATH);
         let result = dao.update_account(&pool, &data).await;
         match result {
             Ok(updated_count) => {
                 if updated_count == 0 {
                     info!("No account found with ID: {}", data.id);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": msg.get("account_not_found")})));
+                    return Ok(HttpResponse::NotFound().json(json!({"error": MESSAGE.get("account_not_found")})));
                 }
                 info!("Updated account with ID: {}", data.id);
                 Ok(HttpResponse::Ok().json(json!({"updated": updated_count})))
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": msg.get("failed_to_update_account")})))
+                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_update_account")})))
             },
         }
     }
