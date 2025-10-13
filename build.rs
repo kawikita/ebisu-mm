@@ -44,7 +44,7 @@ fn parse_build_number_from_build_number_rs() -> u64 {
             }
         }
     }
-    return 0;
+    0
 }
 
 /// Cargo.tomlからeditionをパースして返す
