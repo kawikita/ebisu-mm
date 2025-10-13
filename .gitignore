@@ -24,4 +24,5 @@ Cargo.lock
 .DS_Store
 *.db
 *.db-journal
-tools/
+openapi/
+build_number.rs
