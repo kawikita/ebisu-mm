@@ -1,5 +1,5 @@
 use crate::dao::accounts::AccountDaoImpl;
-use crate::handler::accounts;
+use crate::handler::accounts::{self, AccountHandlerImpl};
 use crate::handler::swagger_ui;
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 use log::{debug, info};
@@ -17,6 +17,7 @@ const DEFAULT_SERVER_PORT: &str = "8180";
 pub struct AppData {
     pub db_pool: SqlitePool,
     pub account_dao: AccountDaoImpl,
+    pub account_handler: AccountHandlerImpl,
 }
 
 /// DAOのインスタンスを作成してAppDataにセットする関数
@@ -24,6 +25,7 @@ pub fn create_app_data(pool: &SqlitePool) -> AppData {
     AppData {
         db_pool: pool.clone(),
         account_dao: AccountDaoImpl,
+        account_handler: AccountHandlerImpl,
     }
 }
 

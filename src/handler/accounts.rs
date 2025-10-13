@@ -1,11 +1,11 @@
-use crate::dao::accounts::{AccountDao, AccountDaoImpl};
+use crate::dao::accounts::AccountDao;
 use crate::entity::accounts::Account;
+use crate::utils::app_setup::AppData;
 use crate::utils::message::{MessageHierarchy, set_hierarchy};
 use actix_web::{HttpResponse, Result, web};
 use log::{error, info};
 use once_cell::sync::Lazy;
 use serde_json::json;
-use sqlx::SqlitePool;
 
 const MODULE_PATH: &str = module_path!();
 const API_BASE_PATH: &str = "/api/account";
@@ -43,12 +43,10 @@ pub fn set_route(cfg: &mut web::ServiceConfig) {
 ))]
 /// 新しい口座情報を作成するAPI
 pub async fn create_account_handler(
-    handler: web::Data<AccountHandlerImpl>,
-    pool: web::Data<SqlitePool>,
-    dao: web::Data<AccountDaoImpl>,
+    app_data: web::Data<AppData>,
     data: web::Json<Account>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    handler.create_account(pool, dao, data).await
+    app_data.account_handler.create_account(app_data.clone(), data).await
 }
 
 #[utoipa::path(delete, path = "/api/account/{id}", tag = "accounts", params(
@@ -60,12 +58,10 @@ pub async fn create_account_handler(
 ))]
 /// 指定されたIDの口座情報を削除するAPI
 pub async fn delete_account_handler(
-    handler: web::Data<AccountHandlerImpl>,
-    pool: web::Data<SqlitePool>,
-    dao: web::Data<AccountDaoImpl>,
+    app_data: web::Data<AppData>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    handler.delete_account(pool, dao, path).await
+    app_data.account_handler.delete_account(app_data.clone(), path).await
 }
 
 #[utoipa::path(get, path = "/api/account/{id}", tag = "accounts", params(
@@ -77,12 +73,10 @@ pub async fn delete_account_handler(
 ))]
 /// 指定されたIDの口座情報を取得するAPI
 pub async fn get_account_by_id_handler(
-    handler: web::Data<AccountHandlerImpl>,
-    pool: web::Data<SqlitePool>,
-    dao: web::Data<AccountDaoImpl>,
+    app_data: web::Data<AppData>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    handler.get_account_by_id(pool, dao, path).await
+    app_data.account_handler.get_account_by_id(app_data.clone(), path).await
 }
 
 #[utoipa::path(get, path = "/api/account", tag = "accounts", responses(
@@ -90,12 +84,8 @@ pub async fn get_account_by_id_handler(
     (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_fetch_accounts")}))
 ))]
 /// 全ての口座情報を取得するAPI
-pub async fn get_accounts_list_all_handler(
-    handler: web::Data<AccountHandlerImpl>,
-    pool: web::Data<SqlitePool>,
-    dao: web::Data<AccountDaoImpl>,
-) -> Result<HttpResponse, actix_web::Error> {
-    handler.get_accounts_list_all(pool, dao).await
+pub async fn get_accounts_list_all_handler(app_data: web::Data<AppData>) -> Result<HttpResponse, actix_web::Error> {
+    app_data.account_handler.get_accounts_list_all(app_data.clone()).await
 }
 
 #[utoipa::path(get, path = "/api/account/type/{type_name}", tag = "accounts", params(
@@ -107,12 +97,10 @@ pub async fn get_accounts_list_all_handler(
 ))]
 /// 指定された口座種別の口座情報を取得するAPI
 pub async fn get_accounts_list_by_type_handler(
-    handler: web::Data<AccountHandlerImpl>,
-    pool: web::Data<SqlitePool>,
-    dao: web::Data<AccountDaoImpl>,
+    app_data: web::Data<AppData>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    handler.get_accounts_list_by_type(pool, dao, path).await
+    app_data.account_handler.get_accounts_list_by_type(app_data.clone(), path).await
 }
 
 #[utoipa::path(put, path = "/api/account", tag = "accounts", request_body = Account, responses(
@@ -122,12 +110,10 @@ pub async fn get_accounts_list_by_type_handler(
 ))]
 /// 指定されたIDの口座情報を更新するAPI
 pub async fn update_account_handler(
-    handler: web::Data<AccountHandlerImpl>,
-    pool: web::Data<SqlitePool>,
-    dao: web::Data<AccountDaoImpl>,
+    app_data: web::Data<AppData>,
     data: web::Json<Account>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    handler.update_account(pool, dao, data).await
+    app_data.account_handler.update_account(app_data.clone(), data).await
 }
 
 // ハンドラートレイト定義（グローバルスコープに移動）
@@ -135,37 +121,28 @@ pub async fn update_account_handler(
 pub trait AccountHandler {
     async fn create_account(
         &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
+        app_data: web::Data<AppData>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error>;
     async fn delete_account(
         &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
+        app_data: web::Data<AppData>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error>;
     async fn get_account_by_id(
         &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
+        app_data: web::Data<AppData>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error>;
-    async fn get_accounts_list_all(
-        &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
-    ) -> Result<HttpResponse, actix_web::Error>;
+    async fn get_accounts_list_all(&self, app_data: web::Data<AppData>) -> Result<HttpResponse, actix_web::Error>;
     async fn get_accounts_list_by_type(
         &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
+        app_data: web::Data<AppData>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error>;
     async fn update_account(
         &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
+        app_data: web::Data<AppData>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error>;
 }
@@ -185,14 +162,13 @@ impl AccountHandler for AccountHandlerImpl {
     /// 成功時はHTTP 201と作成された口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
     async fn create_account(
         &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
+        app_data: web::Data<AppData>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to create a new account");
         let account_id = data.id.clone();
         // IDの重複チェック
-        let result = dao.get_account_by_id(&pool, &account_id).await;
+        let result = app_data.account_dao.get_account_by_id(&app_data.db_pool, &account_id).await;
         match result {
             Ok(account) => {
                 if account.is_some() {
@@ -210,7 +186,7 @@ impl AccountHandler for AccountHandlerImpl {
             },
         }
         // 口座の作成
-        let result = dao.create_account(&pool, &data).await;
+        let result = app_data.account_dao.create_account(&app_data.db_pool, &data).await;
         match result {
             Ok(success_count) => {
                 info!("Created {} new account(s).", success_count);
@@ -232,13 +208,12 @@ impl AccountHandler for AccountHandlerImpl {
     /// 成功時はHTTP 200と成功メッセージ、失敗時はHTTP 500とエラーメッセージ
     async fn delete_account(
         &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
+        app_data: web::Data<AppData>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to delete account by ID: {}", account_id);
-        let result = dao.delete_account(&pool, account_id).await;
+        let result = app_data.account_dao.delete_account(&app_data.db_pool, account_id).await;
         match result {
             Ok(del_count) => {
                 if del_count == 0 {
@@ -264,13 +239,12 @@ impl AccountHandler for AccountHandlerImpl {
     /// 成功時はHTTP 200と口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
     async fn get_account_by_id(
         &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
+        app_data: web::Data<AppData>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to fetch account by ID: {}", account_id);
-        let result = dao.get_account_by_id(&pool, account_id).await;
+        let result = app_data.account_dao.get_account_by_id(&app_data.db_pool, account_id).await;
         match result {
             Ok(account) => {
                 if account.is_none() {
@@ -293,13 +267,9 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `dao` - 口座情報DAO
     /// # 戻り値
     /// 成功時はHTTP 200と口座情報のJSON配列、失敗時はHTTP 500とエラーメッセージ
-    async fn get_accounts_list_all(
-        &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
-    ) -> Result<HttpResponse, actix_web::Error> {
+    async fn get_accounts_list_all(&self, app_data: web::Data<AppData>) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to fetch all accounts");
-        let result = dao.get_accounts_list_all(&pool).await;
+        let result = app_data.account_dao.get_accounts_list_all(&app_data.db_pool).await;
         match result {
             Ok(accounts) => {
                 info!("Fetched {} accounts.", accounts.len());
@@ -321,13 +291,12 @@ impl AccountHandler for AccountHandlerImpl {
     /// 成功時はHTTP 200と口座情報のJSON配列、失敗時はHTTP 500とエラーメッセージ
     async fn get_accounts_list_by_type(
         &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
+        app_data: web::Data<AppData>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error> {
         let type_name = path.as_str();
         info!("Received request to fetch accounts of type: {}", type_name);
-        let result = dao.get_accounts_list_by_type(&pool, type_name).await;
+        let result = app_data.account_dao.get_accounts_list_by_type(&app_data.db_pool, type_name).await;
         match result {
             Ok(accounts) => {
                 if accounts.is_empty() {
@@ -353,12 +322,11 @@ impl AccountHandler for AccountHandlerImpl {
     /// 成功時はHTTP 200と更新された口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
     async fn update_account(
         &self,
-        pool: web::Data<SqlitePool>,
-        dao: web::Data<AccountDaoImpl>,
+        app_data: web::Data<AppData>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to update account by ID: {}", data.id);
-        let result = dao.update_account(&pool, &data).await;
+        let result = app_data.account_dao.update_account(&app_data.db_pool, &data).await;
         match result {
             Ok(updated_count) => {
                 if updated_count == 0 {
@@ -379,33 +347,26 @@ impl AccountHandler for AccountHandlerImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::app_setup::create_app_data;
     use crate::utils::unit_test::fixtures::accounts as fixtures_accounts;
     use crate::utils::unit_test::fixtures::db as fixtures_db;
     use actix_web::body::to_bytes;
     use actix_web::http::StatusCode;
 
-    async fn setup() -> (web::Data<SqlitePool>, web::Data<AccountDaoImpl>, AccountHandlerImpl) {
-        let (pool, dao, handler) = setup_empty().await;
-        fixtures_accounts::insert_test_account(&pool).await;
-        (pool, dao, handler)
+    async fn setup() -> AppData {
+        let app_data = setup_empty().await;
+        fixtures_accounts::insert_test_account(&app_data.db_pool).await;
+        app_data
     }
 
-    async fn setup_empty() -> (web::Data<SqlitePool>, web::Data<AccountDaoImpl>, AccountHandlerImpl) {
+    async fn setup_empty() -> AppData {
         let pool: web::Data<sqlx::Pool<sqlx::Sqlite>> = web::Data::new(fixtures_db::create_test_db().await);
-        let (dao, handler) = get_dao_and_handler();
-        (pool, dao, handler)
+        create_app_data(&pool)
     }
 
-    async fn setup_undefined() -> (web::Data<SqlitePool>, web::Data<AccountDaoImpl>, AccountHandlerImpl) {
+    async fn setup_undefined() -> AppData {
         let pool = web::Data::new(fixtures_db::create_undefined_db().await);
-        let (dao, handler) = get_dao_and_handler();
-        (pool, dao, handler)
-    }
-
-    fn get_dao_and_handler() -> (web::Data<AccountDaoImpl>, AccountHandlerImpl) {
-        let dao = web::Data::new(AccountDaoImpl);
-        let handler = AccountHandlerImpl;
-        (dao, handler)
+        create_app_data(&pool)
     }
 
     mod create_account {
@@ -414,11 +375,11 @@ mod tests {
         #[actix_web::test]
         async fn create_success() {
             // preparation
-            let (pool, dao, handler) = setup_empty().await;
+            let app_data = web::Data::new(setup_empty().await);
             let new_account = fixtures_accounts::get_first_account();
             let new_account_json = web::Json(new_account.clone());
             // execution
-            let resp = handler.create_account(pool, dao, new_account_json).await.unwrap();
+            let resp = app_data.account_handler.create_account(app_data.clone(), new_account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::CREATED);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -429,11 +390,11 @@ mod tests {
         #[actix_web::test]
         async fn create_conflict() {
             // preparation
-            let (pool, dao, handler) = setup().await;
+            let app_data = web::Data::new(setup().await);
             let existing_account = fixtures_accounts::get_first_account();
             let existing_account_json = web::Json(existing_account.clone());
             // execution
-            let resp = handler.create_account(pool, dao, existing_account_json).await.unwrap();
+            let resp = app_data.account_handler.create_account(app_data.clone(), existing_account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::CONFLICT);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -444,11 +405,11 @@ mod tests {
         #[actix_web::test]
         async fn create_servererror_on_check_exists() {
             // preparation
-            let (pool, dao, handler) = setup_undefined().await;
+            let app_data = web::Data::new(setup_undefined().await);
             let new_account = fixtures_accounts::get_first_account();
             let new_account_json = web::Json(new_account.clone());
             // execution
-            let resp = handler.create_account(pool, dao, new_account_json).await.unwrap();
+            let resp = app_data.account_handler.create_account(app_data.clone(), new_account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -460,11 +421,11 @@ mod tests {
         // #[actix_web::test]
         // async fn create_servererror_on_creation() {
         //     // preparation
-        //     let (pool, dao, handler) = setup_undefined().await;
+        //     let app_data = web::Data::new(setup_undefined().await);
         //     let new_account = fixtures_accounts::get_first_account();
         //     let new_account_json = web::Json(new_account.clone());
         //     // execution
-        //     let resp = handler.create_account(pool, dao, new_account_json).await.unwrap();
+        //     let resp = app_data.account_handler.create_account(app_data.clone(), new_account_json).await.unwrap();
         //     // assersion
         //     assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         //     let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -479,9 +440,9 @@ mod tests {
         #[actix_web::test]
         async fn get_all_is_empty() {
             // preparation
-            let (pool, dao, handler) = setup_empty().await;
+            let app_data = web::Data::new(setup_empty().await);
             // execution
-            let resp = handler.get_accounts_list_all(pool, dao).await.unwrap();
+            let resp = app_data.account_handler.get_accounts_list_all(app_data.clone()).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -492,10 +453,10 @@ mod tests {
         #[actix_web::test]
         async fn get_all_found_3accounts() {
             // preparation
-            let (pool, dao, handler) = setup().await;
+            let app_data = web::Data::new(setup().await);
             let account_list = fixtures_accounts::get_sorted_account_list();
             // execution
-            let resp = handler.get_accounts_list_all(pool, dao).await.unwrap();
+            let resp = app_data.account_handler.get_accounts_list_all(app_data.clone()).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -509,9 +470,9 @@ mod tests {
         #[actix_web::test]
         async fn get_all_servererror() {
             // preparation
-            let (pool, dao, handler) = setup_undefined().await;
+            let app_data = web::Data::new(setup_undefined().await);
             // execution
-            let resp = handler.get_accounts_list_all(pool, dao).await.unwrap();
+            let resp = app_data.account_handler.get_accounts_list_all(app_data.clone()).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -526,10 +487,10 @@ mod tests {
         #[actix_web::test]
         async fn get_type_not_found() {
             // preparation
-            let (pool, dao, handler) = setup().await;
+            let app_data = web::Data::new(setup().await);
             let path = web::Path::from("Other".to_string());
             // execution
-            let resp = handler.get_accounts_list_by_type(pool, dao, path).await.unwrap();
+            let resp = app_data.account_handler.get_accounts_list_by_type(app_data.clone(), path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -540,11 +501,11 @@ mod tests {
         #[actix_web::test]
         async fn get_type_found() {
             // preparation
-            let (pool, dao, handler) = setup().await;
+            let app_data = web::Data::new(setup().await);
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.account_type.name.clone());
             // execution
-            let resp = handler.get_accounts_list_by_type(pool, dao, path).await.unwrap();
+            let resp = app_data.account_handler.get_accounts_list_by_type(app_data.clone(), path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -556,11 +517,11 @@ mod tests {
         #[actix_web::test]
         async fn get_type_servererror() {
             // preparation
-            let (pool, dao, handler) = setup_undefined().await;
+            let app_data = web::Data::new(setup_undefined().await);
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.account_type.name.clone());
             // execution
-            let resp = handler.get_accounts_list_by_type(pool, dao, path).await.unwrap();
+            let resp = app_data.account_handler.get_accounts_list_by_type(app_data.clone(), path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -575,10 +536,10 @@ mod tests {
         #[actix_web::test]
         async fn get_by_id_not_found() {
             // preparation
-            let (pool, dao, handler) = setup().await;
+            let app_data = web::Data::new(setup().await);
             let path = web::Path::from("nonexistent_id".to_string());
             // execution
-            let resp = handler.get_account_by_id(pool, dao, path).await.unwrap();
+            let resp = app_data.account_handler.get_account_by_id(app_data.clone(), path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -589,11 +550,11 @@ mod tests {
         #[actix_web::test]
         async fn get_by_id_found() {
             // preparation
-            let (pool, dao, handler) = setup().await;
+            let app_data = web::Data::new(setup().await);
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.id.clone());
             // execution
-            let resp = handler.get_account_by_id(pool, dao, path).await.unwrap();
+            let resp = app_data.account_handler.get_account_by_id(app_data.clone(), path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -604,10 +565,10 @@ mod tests {
         #[actix_web::test]
         async fn get_by_id_servererror() {
             // preparation
-            let (pool, dao, handler) = setup_undefined().await;
+            let app_data = web::Data::new(setup_undefined().await);
             let path = web::Path::from("any_id".to_string());
             // execution
-            let resp = handler.get_account_by_id(pool, dao, path).await.unwrap();
+            let resp = app_data.account_handler.get_account_by_id(app_data.clone(), path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -622,10 +583,10 @@ mod tests {
         #[actix_web::test]
         async fn delete_not_found() {
             // preparation
-            let (pool, dao, handler) = setup().await;
+            let app_data = web::Data::new(setup().await);
             let path = web::Path::from("nonexistent_id".to_string());
             // execution
-            let resp = handler.delete_account(pool, dao, path).await.unwrap();
+            let resp = app_data.account_handler.delete_account(app_data.clone(), path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -636,11 +597,11 @@ mod tests {
         #[actix_web::test]
         async fn delete_success() {
             // preparation
-            let (pool, dao, handler) = setup().await;
+            let app_data = web::Data::new(setup().await);
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.id.clone());
             // execution
-            let resp = handler.delete_account(pool, dao, path).await.unwrap();
+            let resp = app_data.account_handler.delete_account(app_data.clone(), path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::NO_CONTENT);
         }
@@ -648,10 +609,10 @@ mod tests {
         #[actix_web::test]
         async fn delete_servererror() {
             // preparation
-            let (pool, dao, handler) = setup_undefined().await;
+            let app_data = web::Data::new(setup_undefined().await);
             let path = web::Path::from("any_id".to_string());
             // execution
-            let resp = handler.delete_account(pool, dao, path).await.unwrap();
+            let resp = app_data.account_handler.delete_account(app_data.clone(), path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -666,11 +627,11 @@ mod tests {
         #[actix_web::test]
         async fn update_not_found() {
             // preparation
-            let (pool, dao, handler) = setup().await;
+            let app_data = web::Data::new(setup().await);
             let account = fixtures_accounts::create_new_account();
             let account_json = web::Json(account);
             // execution
-            let resp = handler.update_account(pool, dao, account_json).await.unwrap();
+            let resp = app_data.account_handler.update_account(app_data.clone(), account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -681,12 +642,12 @@ mod tests {
         #[actix_web::test]
         async fn update_success() {
             // preparation
-            let (pool, dao, handler) = setup().await;
+            let app_data = web::Data::new(setup().await);
             let mut account = fixtures_accounts::get_first_account();
             account.memo = Some("更新されたメモ".to_string());
             let account_json = web::Json(account.clone());
             // execution
-            let resp = handler.update_account(pool, dao, account_json).await.unwrap();
+            let resp = app_data.account_handler.update_account(app_data.clone(), account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -697,11 +658,11 @@ mod tests {
         #[actix_web::test]
         async fn update_servererror() {
             // preparation
-            let (pool, dao, handler) = setup_undefined().await;
+            let app_data = web::Data::new(setup_undefined().await);
             let account = fixtures_accounts::get_first_account();
             let account_json = web::Json(account);
             // execution
-            let resp = handler.update_account(pool, dao, account_json).await.unwrap();
+            let resp = app_data.account_handler.update_account(app_data.clone(), account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
