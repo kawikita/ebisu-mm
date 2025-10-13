@@ -17,4 +17,9 @@ pub enum Commands {
         #[arg(short, long, help = "Output file path")]
         file: String,
     },
+    #[command(about = "Show version information")]
+    Version {
+        #[arg(short, long, help = "Show detailed version information")]
+        verbose: bool,
+    },
 }

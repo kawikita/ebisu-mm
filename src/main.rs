@@ -7,6 +7,7 @@ use dotenv::dotenv;
 use ebisu_api::utils::{
     app_setup, exporter, logging,
     options::{Cli, Commands},
+    version,
 };
 use log::info;
 
@@ -20,6 +21,10 @@ async fn main() -> std::io::Result<()> {
             println!("OpenAPI JSON exported to {}", file);
             return Ok(());
         },
+        Some(Commands::Version { verbose }) => {
+            version::show_version(verbose);
+            return Ok(());
+        }
         None => {
             dotenv().ok();
             logging::init_logger();
