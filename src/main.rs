@@ -22,7 +22,7 @@ async fn main() -> std::io::Result<()> {
             return Ok(());
         },
         Some(Commands::Version { verbose }) => {
-            version::show_version(verbose);
+            version::show_version(*verbose);
             return Ok(());
         }
         None => {
