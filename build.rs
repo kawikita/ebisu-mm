@@ -1,11 +1,16 @@
+use serde_yaml::{Mapping, Value};
 use std::env;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use serde_yaml::{Mapping, Value};
-
 fn main() {
+    export_messages();
+}
+
+/// messagesディレクトリ以下のすべてのYAMLファイルを読み込み、1つのネストされたYAML構造にマージして
+/// Rustの静的変数として埋め込む。
+fn export_messages() {
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest_path = Path::new(&out_dir).join("messages_embedded.rs");
 
