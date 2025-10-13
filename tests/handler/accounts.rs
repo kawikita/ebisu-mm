@@ -3,10 +3,9 @@ use crate::common::fixtures::db as fixtures_db;
 use actix_web::dev::ServiceResponse;
 use actix_web::http::StatusCode;
 use actix_web::{App, test, web};
-use ebisu_api::dao::accounts::AccountDaoImpl;
 use ebisu_api::entity::accounts::Account;
-use ebisu_api::handler::accounts::AccountHandlerImpl;
 use ebisu_api::handler::accounts::set_route as accounts_configure;
+use ebisu_api::utils::app_setup::create_app_data;
 use serde_json::json;
 use sqlx::{Pool, Sqlite};
 use std::vec;
@@ -27,16 +26,10 @@ async fn call_api(
     api_path: &str,
     send_body: Option<&Account>,
 ) -> ServiceResponse {
-    let dao = AccountDaoImpl;
-    let handler = AccountHandlerImpl;
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(pool.clone()))
-            .app_data(web::Data::new(dao))
-            .app_data(web::Data::new(handler))
-            .configure(accounts_configure),
-    )
-    .await;
+    let app_data = create_app_data(&pool);
+    let app = test::init_service(App::new()
+        .app_data(web::Data::new(app_data))
+        .configure(accounts_configure)).await;
     let req = {
         match method {
             HttpMethod::GET => test::TestRequest::get().uri(api_path).to_request(),

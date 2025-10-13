@@ -4,7 +4,10 @@
 
 use clap::Parser;
 use dotenv::dotenv;
-use ebisu_api::utils::{app_setup, exporter, logging, options::{Cli, Commands}};
+use ebisu_api::utils::{
+    app_setup, exporter, logging,
+    options::{Cli, Commands},
+};
 use log::info;
 
 #[actix_web::main]
@@ -16,7 +19,7 @@ async fn main() -> std::io::Result<()> {
             exporter::export_openapi_json(&file).expect("Failed to export OpenAPI JSON");
             println!("OpenAPI JSON exported to {}", file);
             return Ok(());
-        }
+        },
         None => {
             dotenv().ok();
             logging::init_logger();
@@ -29,6 +32,6 @@ async fn main() -> std::io::Result<()> {
             let result = server.await;
             info!("Ebisu API server stopped.");
             result
-        }
+        },
     }
 }
