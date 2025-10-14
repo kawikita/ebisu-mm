@@ -24,7 +24,7 @@ async fn main() -> std::io::Result<()> {
         Some(Commands::Version { verbose }) => {
             version::show_version(*verbose);
             return Ok(());
-        }
+        },
         None => {
             dotenv().ok();
             logging::init_logger();
