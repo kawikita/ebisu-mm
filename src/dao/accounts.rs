@@ -1,6 +1,7 @@
 use crate::entity::accounts::{Account, AccountType};
 use log::{debug, info};
 use sqlx::{FromRow, Result, SqlitePool};
+use std::sync::Arc;
 
 /// 口座情報に関するデータアクセスオブジェクト(DAO)のトレイト定義。
 #[async_trait::async_trait]
@@ -16,6 +17,19 @@ pub trait AccountDao {
 /// AccountDaoトレイトの実装。
 #[derive(Clone)]
 pub struct AccountDaoImpl;
+
+/// AccountDaoImplのコンストラクタ
+impl AccountDaoImpl {
+    /// AccountDaoImplの新しいインスタンスを生成する。
+    pub fn new() -> Self {
+        AccountDaoImpl
+    }
+
+    /// AccountDaoImplの新しいArcラップされたインスタンスを生成する。
+    pub fn new_arc() -> Arc<dyn AccountDao + Send + Sync> {
+        Arc::new(AccountDaoImpl)
+    }
+}
 
 #[async_trait::async_trait]
 impl AccountDao for AccountDaoImpl {
@@ -283,7 +297,7 @@ mod tests {
             // preparation
             let pool = fixtures_db::create_test_db().await;
             // execution
-            let dao = AccountDaoImpl;
+            let dao = AccountDaoImpl::new_arc();
             let accounts = dao.get_accounts_list_all(&pool).await.unwrap();
             // assertion
             assert!(accounts.is_empty());
@@ -296,7 +310,7 @@ mod tests {
             let first_account = fixtures_accounts::get_first_account();
             fixtures_accounts::insert_account(&pool, &first_account).await;
             // execution
-            let dao = AccountDaoImpl;
+            let dao = AccountDaoImpl::new_arc();
             let accounts = dao.get_accounts_list_all(&pool).await.unwrap();
             // assertion
             assert_eq!(accounts.len(), 1);
@@ -310,7 +324,7 @@ mod tests {
             fixtures_accounts::insert_test_account(&pool).await;
             let account_list = fixtures_accounts::get_sorted_account_list();
             // execution
-            let dao = AccountDaoImpl;
+            let dao = AccountDaoImpl::new_arc();
             let accounts = dao.get_accounts_list_all(&pool).await.unwrap();
             // assertion
             assert_eq!(accounts.len(), 3);
@@ -330,7 +344,7 @@ mod tests {
             let pool = fixtures_db::create_test_db().await;
             fixtures_accounts::insert_test_account(&pool).await;
             // execution
-            let dao = AccountDaoImpl;
+            let dao = AccountDaoImpl::new_arc();
             let filtered = dao.get_accounts_list_by_type(&pool, "存在しない口座タイプ").await.unwrap();
             // assertion
             assert!(filtered.is_empty());
@@ -343,7 +357,7 @@ mod tests {
             fixtures_accounts::insert_test_account(&pool).await;
             let account_type_name = "銀行口座(普通)".to_string();
             // execution
-            let dao = AccountDaoImpl;
+            let dao = AccountDaoImpl::new_arc();
             let filtered = dao.get_accounts_list_by_type(&pool, &account_type_name).await.unwrap();
             // assertion
             assert_eq!(filtered.len(), 1);
@@ -359,7 +373,7 @@ mod tests {
             fixtures_accounts::insert_account(&pool, &adding_account).await;
             let account_type_name = "銀行口座(普通)".to_string();
             // execution
-            let dao = AccountDaoImpl;
+            let dao = AccountDaoImpl::new_arc();
             let filtered = dao.get_accounts_list_by_type(&pool, &account_type_name).await.unwrap();
             // assertion
             assert_eq!(filtered.len(), 2);
@@ -380,7 +394,7 @@ mod tests {
             fixtures_accounts::insert_test_account(&pool).await;
             let search_id = Uuid::new_v4().to_string();
             // execution
-            let dao = AccountDaoImpl;
+            let dao = AccountDaoImpl::new_arc();
             let fetched = dao.get_account_by_id(&pool, &search_id).await.unwrap();
             // assertion
             assert!(fetched.is_none());
@@ -393,7 +407,7 @@ mod tests {
             fixtures_accounts::insert_test_account(&pool).await;
             let first_account = fixtures_accounts::get_first_account();
             // execution
-            let dao = AccountDaoImpl;
+            let dao = AccountDaoImpl::new_arc();
             let fetched = dao.get_account_by_id(&pool, &first_account.id).await.unwrap();
             // assertion
             assert!(fetched.is_some());
@@ -415,7 +429,7 @@ mod tests {
             let pool = fixtures_db::create_test_db().await;
             let adding_account = fixtures_accounts::create_new_account();
             // execution
-            let dao = AccountDaoImpl;
+            let dao = AccountDaoImpl::new_arc();
             let result = dao.create_account(&pool, &adding_account).await.unwrap();
             // assertion
             assert_eq!(result, 1);
@@ -439,7 +453,7 @@ mod tests {
             let pool = fixtures_db::create_test_db().await;
             fixtures_accounts::insert_test_account(&pool).await;
             let before_account = fixtures_accounts::get_first_account();
-            let dao = AccountDaoImpl;
+            let dao = AccountDaoImpl::new_arc();
             let before = dao.get_account_by_id(&pool, &before_account.id).await.unwrap().unwrap();
             let mut updated_account = convert_object_to_row(&before);
             updated_account.memo = Some("更新後のメモ".to_string());
@@ -472,7 +486,7 @@ mod tests {
             fixtures_accounts::insert_test_account(&pool).await;
             let delete_account = fixtures_accounts::get_first_account();
             // execution
-            let dao = AccountDaoImpl;
+            let dao = AccountDaoImpl::new_arc();
             let deleted = dao.delete_account(&pool, &delete_account.id).await.unwrap();
             // assertion
             assert_eq!(deleted, 1);
