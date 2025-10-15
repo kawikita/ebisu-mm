@@ -1,11 +1,13 @@
+use crate::dao::accounts::AccountDao;
 use crate::entity::accounts::Account;
-use crate::utils::app_setup::AppData;
+use crate::utils::app_setup::AppModule;
 use crate::utils::message::{MessageHierarchy, set_hierarchy};
 use actix_web::{HttpResponse, Result, web};
 use log::{error, info};
 use once_cell::sync::Lazy;
 use serde_json::json;
-use shaku::{Component, Interface};
+use shaku::{Component, HasComponent, Interface};
+use sqlx::SqlitePool;
 use std::sync::Arc;
 
 const MODULE_PATH: &str = module_path!();
@@ -44,10 +46,12 @@ pub fn set_route(cfg: &mut web::ServiceConfig) {
 ))]
 /// 新しい口座情報を作成するAPI
 pub async fn create_account_handler(
-    app_data: web::Data<AppData>,
+    db_pool: web::Data<SqlitePool>,
+    app_module: web::Data<AppModule>,
     data: web::Json<Account>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    app_data.account_handler.create_account(app_data.clone(), data).await
+    let handler: Arc<dyn AccountHandler> = app_module.resolve();
+    handler.create_account(db_pool, data).await
 }
 
 #[utoipa::path(delete, path = "/api/account/{id}", tag = "accounts", params(
@@ -59,10 +63,12 @@ pub async fn create_account_handler(
 ))]
 /// 指定されたIDの口座情報を削除するAPI
 pub async fn delete_account_handler(
-    app_data: web::Data<AppData>,
+    db_pool: web::Data<SqlitePool>,
+    app_module: web::Data<AppModule>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    app_data.account_handler.delete_account(app_data.clone(), path).await
+    let handler: Arc<dyn AccountHandler> = app_module.resolve();
+    handler.delete_account(db_pool, path).await
 }
 
 #[utoipa::path(get, path = "/api/account/{id}", tag = "accounts", params(
@@ -74,10 +80,12 @@ pub async fn delete_account_handler(
 ))]
 /// 指定されたIDの口座情報を取得するAPI
 pub async fn get_account_by_id_handler(
-    app_data: web::Data<AppData>,
+    db_pool: web::Data<SqlitePool>,
+    app_module: web::Data<AppModule>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    app_data.account_handler.get_account_by_id(app_data.clone(), path).await
+    let handler: Arc<dyn AccountHandler> = app_module.resolve();
+    handler.get_account_by_id(db_pool, path).await
 }
 
 #[utoipa::path(get, path = "/api/account", tag = "accounts", responses(
@@ -85,8 +93,12 @@ pub async fn get_account_by_id_handler(
     (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_fetch_accounts")}))
 ))]
 /// 全ての口座情報を取得するAPI
-pub async fn get_accounts_list_all_handler(app_data: web::Data<AppData>) -> Result<HttpResponse, actix_web::Error> {
-    app_data.account_handler.get_accounts_list_all(app_data.clone()).await
+pub async fn get_accounts_list_all_handler(
+    db_pool: web::Data<SqlitePool>,
+    app_module: web::Data<AppModule>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let handler: Arc<dyn AccountHandler> = app_module.resolve();
+    handler.get_accounts_list_all(db_pool).await
 }
 
 #[utoipa::path(get, path = "/api/account/type/{type_name}", tag = "accounts", params(
@@ -98,10 +110,12 @@ pub async fn get_accounts_list_all_handler(app_data: web::Data<AppData>) -> Resu
 ))]
 /// 指定された口座種別の口座情報を取得するAPI
 pub async fn get_accounts_list_by_type_handler(
-    app_data: web::Data<AppData>,
+    db_pool: web::Data<SqlitePool>,
+    app_module: web::Data<AppModule>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    app_data.account_handler.get_accounts_list_by_type(app_data.clone(), path).await
+    let handler: Arc<dyn AccountHandler> = app_module.resolve();
+    handler.get_accounts_list_by_type(db_pool, path).await
 }
 
 #[utoipa::path(put, path = "/api/account", tag = "accounts", request_body = Account, responses(
@@ -111,10 +125,12 @@ pub async fn get_accounts_list_by_type_handler(
 ))]
 /// 指定されたIDの口座情報を更新するAPI
 pub async fn update_account_handler(
-    app_data: web::Data<AppData>,
+    db_pool: web::Data<SqlitePool>,
+    app_module: web::Data<AppModule>,
     data: web::Json<Account>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    app_data.account_handler.update_account(app_data.clone(), data).await
+    let handler: Arc<dyn AccountHandler> = app_module.resolve();
+    handler.update_account(db_pool, data).await
 }
 
 // ハンドラートレイト定義（グローバルスコープに移動）
@@ -122,45 +138,38 @@ pub async fn update_account_handler(
 pub trait AccountHandler: Interface {
     async fn create_account(
         &self,
-        app_data: web::Data<AppData>,
+        db_pool: web::Data<SqlitePool>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error>;
     async fn delete_account(
         &self,
-        app_data: web::Data<AppData>,
+        db_pool: web::Data<SqlitePool>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error>;
     async fn get_account_by_id(
         &self,
-        app_data: web::Data<AppData>,
+        db_pool: web::Data<SqlitePool>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error>;
-    async fn get_accounts_list_all(&self, app_data: web::Data<AppData>) -> Result<HttpResponse, actix_web::Error>;
+    async fn get_accounts_list_all(&self, db_pool: web::Data<SqlitePool>) -> Result<HttpResponse, actix_web::Error>;
     async fn get_accounts_list_by_type(
         &self,
-        app_data: web::Data<AppData>,
+        db_pool: web::Data<SqlitePool>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error>;
     async fn update_account(
         &self,
-        app_data: web::Data<AppData>,
+        db_pool: web::Data<SqlitePool>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error>;
 }
 
 /// 口座情報ハンドラーの実装
-#[derive(Clone, Component, Default)]
+#[derive(Clone, Component)]
 #[shaku(interface = AccountHandler)]
-pub struct AccountHandlerImpl;
-
-impl AccountHandlerImpl {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn new_arc() -> Arc<dyn AccountHandler + Send + Sync> {
-        Arc::new(AccountHandlerImpl)
-    }
+pub struct AccountHandlerImpl {
+    #[shaku(inject)]
+    account_dao: Arc<dyn AccountDao>,
 }
 
 #[async_trait::async_trait]
@@ -174,13 +183,13 @@ impl AccountHandler for AccountHandlerImpl {
     /// 成功時はHTTP 201と作成された口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
     async fn create_account(
         &self,
-        app_data: web::Data<AppData>,
+        db_pool: web::Data<SqlitePool>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to create a new account");
         let account_id = data.id.clone();
         // IDの重複チェック
-        let result = app_data.account_dao.get_account_by_id(&app_data.db_pool, &account_id).await;
+        let result = self.account_dao.get_account_by_id(&db_pool, &account_id).await;
         match result {
             Ok(account) => {
                 if account.is_some() {
@@ -198,7 +207,7 @@ impl AccountHandler for AccountHandlerImpl {
             },
         }
         // 口座の作成
-        let result = app_data.account_dao.create_account(&app_data.db_pool, &data).await;
+        let result = self.account_dao.create_account(&db_pool, &data).await;
         match result {
             Ok(success_count) => {
                 info!("Created {} new account(s).", success_count);
@@ -220,12 +229,12 @@ impl AccountHandler for AccountHandlerImpl {
     /// 成功時はHTTP 200と成功メッセージ、失敗時はHTTP 500とエラーメッセージ
     async fn delete_account(
         &self,
-        app_data: web::Data<AppData>,
+        db_pool: web::Data<SqlitePool>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to delete account by ID: {}", account_id);
-        let result = app_data.account_dao.delete_account(&app_data.db_pool, account_id).await;
+        let result = self.account_dao.delete_account(&db_pool, account_id).await;
         match result {
             Ok(del_count) => {
                 if del_count == 0 {
@@ -251,12 +260,12 @@ impl AccountHandler for AccountHandlerImpl {
     /// 成功時はHTTP 200と口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
     async fn get_account_by_id(
         &self,
-        app_data: web::Data<AppData>,
+        db_pool: web::Data<SqlitePool>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to fetch account by ID: {}", account_id);
-        let result = app_data.account_dao.get_account_by_id(&app_data.db_pool, account_id).await;
+        let result = self.account_dao.get_account_by_id(&db_pool, account_id).await;
         match result {
             Ok(account) => {
                 if account.is_none() {
@@ -279,9 +288,9 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `dao` - 口座情報DAO
     /// # 戻り値
     /// 成功時はHTTP 200と口座情報のJSON配列、失敗時はHTTP 500とエラーメッセージ
-    async fn get_accounts_list_all(&self, app_data: web::Data<AppData>) -> Result<HttpResponse, actix_web::Error> {
+    async fn get_accounts_list_all(&self, db_pool: web::Data<SqlitePool>) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to fetch all accounts");
-        let result = app_data.account_dao.get_accounts_list_all(&app_data.db_pool).await;
+        let result = self.account_dao.get_accounts_list_all(&db_pool).await;
         match result {
             Ok(accounts) => {
                 info!("Fetched {} accounts.", accounts.len());
@@ -303,12 +312,12 @@ impl AccountHandler for AccountHandlerImpl {
     /// 成功時はHTTP 200と口座情報のJSON配列、失敗時はHTTP 500とエラーメッセージ
     async fn get_accounts_list_by_type(
         &self,
-        app_data: web::Data<AppData>,
+        db_pool: web::Data<SqlitePool>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error> {
         let type_name = path.as_str();
         info!("Received request to fetch accounts of type: {}", type_name);
-        let result = app_data.account_dao.get_accounts_list_by_type(&app_data.db_pool, type_name).await;
+        let result = self.account_dao.get_accounts_list_by_type(&db_pool, type_name).await;
         match result {
             Ok(accounts) => {
                 if accounts.is_empty() {
@@ -334,11 +343,11 @@ impl AccountHandler for AccountHandlerImpl {
     /// 成功時はHTTP 200と更新された口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
     async fn update_account(
         &self,
-        app_data: web::Data<AppData>,
+        db_pool: web::Data<SqlitePool>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to update account by ID: {}", data.id);
-        let result = app_data.account_dao.update_account(&app_data.db_pool, &data).await;
+        let result = self.account_dao.update_account(&db_pool, &data).await;
         match result {
             Ok(updated_count) => {
                 if updated_count == 0 {
@@ -359,39 +368,46 @@ impl AccountHandler for AccountHandlerImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::app_setup::create_app_data;
     use crate::utils::unit_test::fixtures::accounts as fixtures_accounts;
     use crate::utils::unit_test::fixtures::db as fixtures_db;
     use actix_web::body::to_bytes;
     use actix_web::http::StatusCode;
+    use actix_web::web;
+    use once_cell::sync::Lazy;
 
-    async fn setup() -> AppData {
-        let app_data = setup_empty().await;
-        fixtures_accounts::insert_test_account(&app_data.db_pool).await;
-        app_data
+    static APP_MODULE: Lazy<AppModule> = Lazy::new(|| AppModule::builder().build());
+    static HANDLER: Lazy<Arc<dyn AccountHandler>> = Lazy::new(|| {
+        let handler: Arc<dyn AccountHandler> = APP_MODULE.resolve();
+        handler
+    });
+
+    async fn setup() -> (web::Data<SqlitePool>, Arc<dyn AccountHandler>) {
+        let (pool, _handler) = setup_empty().await;
+        fixtures_accounts::insert_test_account(&pool).await;
+        (pool, HANDLER.clone())
     }
 
-    async fn setup_empty() -> AppData {
-        let pool: web::Data<sqlx::Pool<sqlx::Sqlite>> = web::Data::new(fixtures_db::create_test_db().await);
-        create_app_data(&pool)
+    async fn setup_empty() -> (web::Data<SqlitePool>, Arc<dyn AccountHandler>) {
+        let pool = web::Data::new(fixtures_db::create_test_db().await);
+        (pool, HANDLER.clone())
     }
 
-    async fn setup_undefined() -> AppData {
+    async fn setup_undefined() -> (web::Data<SqlitePool>, Arc<dyn AccountHandler>) {
         let pool = web::Data::new(fixtures_db::create_undefined_db().await);
-        create_app_data(&pool)
+        (pool, HANDLER.clone())
     }
 
     mod create_account {
         use super::*;
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn create_success() {
             // preparation
-            let app_data = web::Data::new(setup_empty().await);
+            let (pool, _handler) = setup_empty().await;
             let new_account = fixtures_accounts::get_first_account();
             let new_account_json = web::Json(new_account.clone());
             // execution
-            let resp = app_data.account_handler.create_account(app_data.clone(), new_account_json).await.unwrap();
+            let resp = _handler.create_account(pool, new_account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::CREATED);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -399,14 +415,14 @@ mod tests {
             assert_eq!(body, json!({"created": 1}));
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn create_conflict() {
             // preparation
-            let app_data = web::Data::new(setup().await);
+            let (pool, _handler) = setup().await;
             let existing_account = fixtures_accounts::get_first_account();
             let existing_account_json = web::Json(existing_account.clone());
             // execution
-            let resp = app_data.account_handler.create_account(app_data.clone(), existing_account_json).await.unwrap();
+            let resp = _handler.create_account(pool, existing_account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::CONFLICT);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -414,14 +430,14 @@ mod tests {
             assert_eq!(body, json!({"error": "Account ID already exists."}));
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn create_servererror_on_check_exists() {
             // preparation
-            let app_data = web::Data::new(setup_undefined().await);
+            let (pool, _handler) = setup_undefined().await;
             let new_account = fixtures_accounts::get_first_account();
             let new_account_json = web::Json(new_account.clone());
             // execution
-            let resp = app_data.account_handler.create_account(app_data.clone(), new_account_json).await.unwrap();
+            let resp = _handler.create_account(pool, new_account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -430,14 +446,14 @@ mod tests {
         }
 
         // TODO: モックを使えるようになってから
-        // #[actix_web::test]
+        // #[tokio::test]
         // async fn create_servererror_on_creation() {
         //     // preparation
-        //     let app_data = web::Data::new(setup_undefined().await);
+        //     let (pool, app_module, _handler) = setup().await;
         //     let new_account = fixtures_accounts::get_first_account();
         //     let new_account_json = web::Json(new_account.clone());
         //     // execution
-        //     let resp = app_data.account_handler.create_account(app_data.clone(), new_account_json).await.unwrap();
+        //     let resp = _handler.create_account(pool, app_module, new_account_json).await.unwrap();
         //     // assersion
         //     assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         //     let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -449,12 +465,12 @@ mod tests {
     mod get_accounts_list_all {
         use super::*;
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn get_all_is_empty() {
             // preparation
-            let app_data = web::Data::new(setup_empty().await);
+            let (pool, _handler) = setup_empty().await;
             // execution
-            let resp = app_data.account_handler.get_accounts_list_all(app_data.clone()).await.unwrap();
+            let resp = _handler.get_accounts_list_all(pool).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -462,13 +478,13 @@ mod tests {
             assert_eq!(accounts.len(), 0);
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn get_all_found_3accounts() {
             // preparation
-            let app_data = web::Data::new(setup().await);
+            let (pool, _handler) = setup().await;
             let account_list = fixtures_accounts::get_sorted_account_list();
             // execution
-            let resp = app_data.account_handler.get_accounts_list_all(app_data.clone()).await.unwrap();
+            let resp = _handler.get_accounts_list_all(pool).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -479,12 +495,12 @@ mod tests {
             assert_eq!(accounts[2].id, account_list[2].id);
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn get_all_servererror() {
             // preparation
-            let app_data = web::Data::new(setup_undefined().await);
+            let (pool, _handler) = setup_undefined().await;
             // execution
-            let resp = app_data.account_handler.get_accounts_list_all(app_data.clone()).await.unwrap();
+            let resp = _handler.get_accounts_list_all(pool).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -496,13 +512,13 @@ mod tests {
     mod get_accounts_list_by_type {
         use super::*;
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn get_type_not_found() {
             // preparation
-            let app_data = web::Data::new(setup().await);
+            let (pool, _handler) = setup().await;
             let path = web::Path::from("Other".to_string());
             // execution
-            let resp = app_data.account_handler.get_accounts_list_by_type(app_data.clone(), path).await.unwrap();
+            let resp = _handler.get_accounts_list_by_type(pool, path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -510,14 +526,14 @@ mod tests {
             assert_eq!(body, json!({"error": "No accounts found."}));
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn get_type_found() {
             // preparation
-            let app_data = web::Data::new(setup().await);
+            let (pool, _handler) = setup().await;
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.account_type.name.clone());
             // execution
-            let resp = app_data.account_handler.get_accounts_list_by_type(app_data.clone(), path).await.unwrap();
+            let resp = _handler.get_accounts_list_by_type(pool, path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -526,14 +542,14 @@ mod tests {
             assert_eq!(accounts[0].id, account.id);
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn get_type_servererror() {
             // preparation
-            let app_data = web::Data::new(setup_undefined().await);
+            let (pool, _handler) = setup_undefined().await;
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.account_type.name.clone());
             // execution
-            let resp = app_data.account_handler.get_accounts_list_by_type(app_data.clone(), path).await.unwrap();
+            let resp = _handler.get_accounts_list_by_type(pool, path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -545,13 +561,13 @@ mod tests {
     mod get_accounts_by_id {
         use super::*;
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn get_by_id_not_found() {
             // preparation
-            let app_data = web::Data::new(setup().await);
+            let (pool, _handler) = setup().await;
             let path = web::Path::from("nonexistent_id".to_string());
             // execution
-            let resp = app_data.account_handler.get_account_by_id(app_data.clone(), path).await.unwrap();
+            let resp = _handler.get_account_by_id(pool, path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -559,14 +575,14 @@ mod tests {
             assert_eq!(body, json!({"error": "Account not found."}));
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn get_by_id_found() {
             // preparation
-            let app_data = web::Data::new(setup().await);
+            let (pool, _handler) = setup().await;
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.id.clone());
             // execution
-            let resp = app_data.account_handler.get_account_by_id(app_data.clone(), path).await.unwrap();
+            let resp = _handler.get_account_by_id(pool, path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -574,13 +590,13 @@ mod tests {
             assert_eq!(fetched_account.id, account.id);
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn get_by_id_servererror() {
             // preparation
-            let app_data = web::Data::new(setup_undefined().await);
+            let (pool, _handler) = setup_undefined().await;
             let path = web::Path::from("any_id".to_string());
             // execution
-            let resp = app_data.account_handler.get_account_by_id(app_data.clone(), path).await.unwrap();
+            let resp = _handler.get_account_by_id(pool, path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -592,13 +608,13 @@ mod tests {
     mod delete_account {
         use super::*;
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn delete_not_found() {
             // preparation
-            let app_data = web::Data::new(setup().await);
+            let (pool, _handler) = setup().await;
             let path = web::Path::from("nonexistent_id".to_string());
             // execution
-            let resp = app_data.account_handler.delete_account(app_data.clone(), path).await.unwrap();
+            let resp = _handler.delete_account(pool, path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -606,25 +622,25 @@ mod tests {
             assert_eq!(body, json!({"error": "Account not found."}));
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn delete_success() {
             // preparation
-            let app_data = web::Data::new(setup().await);
+            let (pool, _handler) = setup().await;
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.id.clone());
             // execution
-            let resp = app_data.account_handler.delete_account(app_data.clone(), path).await.unwrap();
+            let resp = _handler.delete_account(pool, path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::NO_CONTENT);
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn delete_servererror() {
             // preparation
-            let app_data = web::Data::new(setup_undefined().await);
+            let (pool, _handler) = setup_undefined().await;
             let path = web::Path::from("any_id".to_string());
             // execution
-            let resp = app_data.account_handler.delete_account(app_data.clone(), path).await.unwrap();
+            let resp = _handler.delete_account(pool, path).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -636,14 +652,14 @@ mod tests {
     mod update_account {
         use super::*;
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn update_not_found() {
             // preparation
-            let app_data = web::Data::new(setup().await);
+            let (pool, _handler) = setup().await;
             let account = fixtures_accounts::create_new_account();
             let account_json = web::Json(account);
             // execution
-            let resp = app_data.account_handler.update_account(app_data.clone(), account_json).await.unwrap();
+            let resp = _handler.update_account(pool, account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -651,15 +667,15 @@ mod tests {
             assert_eq!(body, json!({"error": "Account not found."}));
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn update_success() {
             // preparation
-            let app_data = web::Data::new(setup().await);
+            let (pool, _handler) = setup().await;
             let mut account = fixtures_accounts::get_first_account();
             account.memo = Some("更新されたメモ".to_string());
             let account_json = web::Json(account.clone());
             // execution
-            let resp = app_data.account_handler.update_account(app_data.clone(), account_json).await.unwrap();
+            let resp = _handler.update_account(pool, account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
@@ -667,14 +683,14 @@ mod tests {
             assert_eq!(body, json!({"updated": 1}));
         }
 
-        #[actix_web::test]
+        #[tokio::test]
         async fn update_servererror() {
             // preparation
-            let app_data = web::Data::new(setup_undefined().await);
+            let (pool, _handler) = setup_undefined().await;
             let account = fixtures_accounts::get_first_account();
             let account_json = web::Json(account);
             // execution
-            let resp = app_data.account_handler.update_account(app_data.clone(), account_json).await.unwrap();
+            let resp = _handler.update_account(pool, account_json).await.unwrap();
             // assersion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
