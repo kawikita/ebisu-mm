@@ -27,9 +27,7 @@ async fn call_api(
     send_body: Option<&Account>,
 ) -> ServiceResponse {
     let app_data = create_app_data(&pool);
-    let app = test::init_service(App::new()
-        .app_data(web::Data::new(app_data))
-        .configure(accounts_configure)).await;
+    let app = test::init_service(App::new().app_data(web::Data::new(app_data)).configure(accounts_configure)).await;
     let req = {
         match method {
             HttpMethod::GET => test::TestRequest::get().uri(api_path).to_request(),
