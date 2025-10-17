@@ -1,11 +1,12 @@
 use crate::entity::accounts::{Account, AccountType};
 use log::{debug, info};
+use shaku::{Component, Interface};
 use sqlx::{FromRow, Result, SqlitePool};
 use std::sync::Arc;
 
 /// 口座情報に関するデータアクセスオブジェクト(DAO)のトレイト定義。
 #[async_trait::async_trait]
-pub trait AccountDao {
+pub trait AccountDao: Interface {
     async fn get_accounts_list_all(&self, pool: &SqlitePool) -> Result<Vec<Account>>;
     async fn get_accounts_list_by_type(&self, pool: &SqlitePool, account_type_name: &str) -> Result<Vec<Account>>;
     async fn get_account_by_id(&self, pool: &SqlitePool, id: &str) -> Result<Option<Account>>;
@@ -15,7 +16,8 @@ pub trait AccountDao {
 }
 
 /// AccountDaoトレイトの実装。
-#[derive(Clone, Default)]
+#[derive(Clone, Component, Default)]
+#[shaku(interface = AccountDao)]
 pub struct AccountDaoImpl;
 
 /// AccountDaoImplのコンストラクタ

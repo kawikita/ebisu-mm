@@ -1,4 +1,3 @@
-use crate::dao::accounts::AccountDao;
 use crate::entity::accounts::Account;
 use crate::utils::app_setup::AppData;
 use crate::utils::message::{MessageHierarchy, set_hierarchy};
@@ -6,6 +5,7 @@ use actix_web::{HttpResponse, Result, web};
 use log::{error, info};
 use once_cell::sync::Lazy;
 use serde_json::json;
+use shaku::{Component, Interface};
 use std::sync::Arc;
 
 const MODULE_PATH: &str = module_path!();
@@ -119,7 +119,7 @@ pub async fn update_account_handler(
 
 // ハンドラートレイト定義（グローバルスコープに移動）
 #[async_trait::async_trait]
-pub trait AccountHandler {
+pub trait AccountHandler: Interface {
     async fn create_account(
         &self,
         app_data: web::Data<AppData>,
@@ -149,7 +149,8 @@ pub trait AccountHandler {
 }
 
 /// 口座情報ハンドラーの実装
-#[derive(Clone, Default)]
+#[derive(Clone, Component, Default)]
+#[shaku(interface = AccountHandler)]
 pub struct AccountHandlerImpl;
 
 impl AccountHandlerImpl {
