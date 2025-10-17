@@ -6,6 +6,7 @@ use actix_web::{HttpResponse, Result, web};
 use log::{error, info};
 use once_cell::sync::Lazy;
 use serde_json::json;
+use std::sync::Arc;
 
 const MODULE_PATH: &str = module_path!();
 const API_BASE_PATH: &str = "/api/account";
@@ -150,6 +151,16 @@ pub trait AccountHandler {
 /// 口座情報ハンドラーの実装
 #[derive(Clone)]
 pub struct AccountHandlerImpl;
+
+impl AccountHandlerImpl {
+    pub fn new() -> Self {
+        AccountHandlerImpl
+    }
+
+    pub fn new_arc() -> Arc<dyn AccountHandler + Send + Sync> {
+        Arc::new(AccountHandlerImpl)
+    }
+}
 
 #[async_trait::async_trait]
 impl AccountHandler for AccountHandlerImpl {
