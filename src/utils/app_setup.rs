@@ -1,31 +1,42 @@
-use crate::dao::accounts::AccountDaoImpl;
-use crate::handler::accounts::{self, AccountHandlerImpl};
+use crate::dao::accounts::{AccountDao, AccountDaoImpl};
+use crate::handler::accounts::{self, AccountHandler, AccountHandlerImpl};
 use crate::handler::swagger_ui;
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 use log::{debug, info};
 use serde_json::json;
+use shaku::{HasComponent, module};
 use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
 use std::env;
+use std::sync::Arc;
 
 const DEFAULT_DATABASE_URL: &str = "sqlite:./ebisu.db";
 const DEFAULT_MAX_CONNECTIONS: &str = "5";
 const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1";
 const DEFAULT_SERVER_PORT: &str = "8180";
 
+// Shakuのモジュール定義
+module! {
+    pub AppModule {
+        components = [AccountDaoImpl, AccountHandlerImpl],
+        providers = []
+    }
+}
+
 // DAOインスタンスをセットするための構造体
 #[derive(Clone)]
 pub struct AppData {
     pub db_pool: SqlitePool,
-    pub account_dao: AccountDaoImpl,
-    pub account_handler: AccountHandlerImpl,
+    pub account_dao: Arc<dyn AccountDao>,
+    pub account_handler: Arc<dyn AccountHandler>,
 }
 
 /// DAOのインスタンスを作成してAppDataにセットする関数
 pub fn create_app_data(pool: &SqlitePool) -> AppData {
+    let module = AppModule::builder().build();
     AppData {
         db_pool: pool.clone(),
-        account_dao: AccountDaoImpl,
-        account_handler: AccountHandlerImpl,
+        account_dao: module.resolve(),
+        account_handler: module.resolve(),
     }
 }
 
