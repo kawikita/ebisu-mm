@@ -1,13 +1,12 @@
-use crate::dao::accounts::{AccountDao, AccountDaoImpl};
-use crate::handler::accounts::{self, AccountHandler, AccountHandlerImpl};
+use crate::dao::accounts::AccountDaoImpl;
+use crate::handler::accounts::{self, AccountHandlerImpl};
 use crate::handler::swagger_ui;
 use actix_web::{App, HttpResponse, HttpServer, Responder, web};
 use log::{debug, info};
 use serde_json::json;
-use shaku::{HasComponent, module};
+use shaku::module;
 use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
 use std::env;
-use std::sync::Arc;
 
 const DEFAULT_DATABASE_URL: &str = "sqlite:./ebisu.db";
 const DEFAULT_MAX_CONNECTIONS: &str = "5";
@@ -22,40 +21,29 @@ module! {
     }
 }
 
-// DAOインスタンスをセットするための構造体
-#[derive(Clone)]
-pub struct AppData {
-    pub db_pool: SqlitePool,
-    pub account_dao: Arc<dyn AccountDao>,
-    pub account_handler: Arc<dyn AccountHandler>,
-}
-
-/// DAOのインスタンスを作成してAppDataにセットする関数
-pub fn create_app_data(pool: &SqlitePool) -> AppData {
-    let module = AppModule::builder().build();
-    AppData {
-        db_pool: pool.clone(),
-        account_dao: module.resolve(),
-        account_handler: module.resolve(),
-    }
+/// ルートエントリーポイントのルーティング設定関数
+pub fn set_route(cfg: &mut web::ServiceConfig) {
+    debug!("Setting up root route configuration.");
+    cfg.service(web::resource("/").route(web::get().to(index)));
+    debug!("Root route configuration set up successfully.");
 }
 
 /// 各APIのルーティング設定をする関数
 fn set_route_config(cfg: &mut web::ServiceConfig) {
     debug!("Setting up route configurations.");
+    set_route(cfg);
     accounts::set_route(cfg);
     swagger_ui::set_route(cfg);
     debug!("Route configurations set up successfully.");
 }
 
 /// Actix Webアプリケーションのファクトリ関数
-pub async fn get_server(app_data: AppData) -> actix_web::dev::Server {
+pub async fn get_server() -> actix_web::dev::Server {
     info!("Configuring and starting Actix Web server.");
+    let db_pool = web::Data::new(get_db_pool().await);
+    let app_module = web::Data::new(AppModule::builder().build());
     let server = HttpServer::new(move || {
-        App::new()
-            .app_data(web::Data::new(app_data.clone()))
-            .configure(set_route_config)
-            .route("/", web::get().to(index))
+        App::new().app_data(db_pool.clone()).app_data(app_module.clone()).configure(set_route_config)
     })
     .bind(get_server_and_port())
     .expect("Failed to bind server address")
