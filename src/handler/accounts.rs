@@ -149,12 +149,12 @@ pub trait AccountHandler {
 }
 
 /// 口座情報ハンドラーの実装
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AccountHandlerImpl;
 
 impl AccountHandlerImpl {
     pub fn new() -> Self {
-        AccountHandlerImpl
+        Default::default()
     }
 
     pub fn new_arc() -> Arc<dyn AccountHandler + Send + Sync> {
