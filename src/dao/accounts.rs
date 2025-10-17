@@ -15,14 +15,14 @@ pub trait AccountDao {
 }
 
 /// AccountDaoトレイトの実装。
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AccountDaoImpl;
 
 /// AccountDaoImplのコンストラクタ
 impl AccountDaoImpl {
     /// AccountDaoImplの新しいインスタンスを生成する。
     pub fn new() -> Self {
-        AccountDaoImpl
+        Default::default()
     }
 
     /// AccountDaoImplの新しいArcラップされたインスタンスを生成する。
