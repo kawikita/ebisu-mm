@@ -1,6 +1,9 @@
-#[cfg(test)]
+#![cfg(test)]
+use crate::dao::accounts::AccountDao;
 use crate::entity::accounts::{Account, AccountType};
+use backtrace::Backtrace;
 use serde::Deserialize;
+use shaku::Component;
 use sqlx::SqlitePool;
 use std::fs;
 
@@ -74,10 +77,12 @@ pub fn get_sorted_account_list() -> Vec<Account> {
     accounts
 }
 
+// テスト用のソート済みのリストの最初の口座を取得するヘルパー関数
 pub fn get_first_account() -> Account {
     get_sorted_account_list().first().unwrap().clone()
 }
 
+// 追加用の新しい口座データを作成するヘルパー関数
 pub fn create_new_account() -> Account {
     Account {
         id: "44444444-4444-4444-4444-444444444444".to_string(),
@@ -89,5 +94,107 @@ pub fn create_new_account() -> Account {
         memo: Some("追加の普通口座のメモ".to_string()),
         created_at: None,
         updated_at: None,
+    }
+}
+
+// モックで呼び出し元がcreate_account関数かどうかを判定するヘルパー関数
+fn is_called_from_create_account(bt: &Backtrace) -> bool {
+    let called_from_create_account = false;
+    for frame in bt.frames() {
+        for symbol in frame.symbols() {
+            if let Some(name) = symbol.name() {
+                if name.to_string().contains("create_account") {
+                    return true;
+                }
+            }
+        }
+    }
+    called_from_create_account
+}
+
+/// テスト用のAccountDaoモック(正常系)
+#[derive(Clone, Component)]
+#[shaku(interface = AccountDao)]
+pub struct ParametrizedMockAccountDaoImpl {
+    pub error_on_create: bool,
+    pub error_on_get: bool,
+    pub error_on_update: bool,
+    pub error_on_delete: bool,
+    pub get_return_empty: bool,
+    pub get_in_create_return_empty: bool,
+    pub create_return_empty: bool,
+    pub update_return_empty: bool,
+    pub delete_return_empty: bool,
+}
+
+#[async_trait::async_trait]
+impl AccountDao for ParametrizedMockAccountDaoImpl {
+    async fn get_accounts_list_all(&self, _pool: &SqlitePool) -> sqlx::Result<Vec<Account>> {
+        if self.error_on_get {
+            return Err(sqlx::Error::RowNotFound);
+        }
+        if self.get_return_empty {
+            return Ok(vec![]);
+        }
+        Ok(get_sorted_account_list())
+    }
+
+    async fn get_accounts_list_by_type(
+        &self,
+        _pool: &SqlitePool,
+        account_type_name: &str,
+    ) -> sqlx::Result<Vec<Account>> {
+        if self.error_on_get {
+            return Err(sqlx::Error::RowNotFound);
+        }
+        if self.get_return_empty {
+            return Ok(vec![]);
+        }
+        let accounts: Vec<Account> =
+            get_account_list().into_iter().filter(|acc| acc.account_type.name == account_type_name).collect();
+        Ok(accounts)
+    }
+
+    async fn get_account_by_id(&self, _pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Account>> {
+        if self.error_on_get {
+            return Err(sqlx::Error::RowNotFound);
+        }
+        if self.get_return_empty
+            || (self.get_in_create_return_empty && is_called_from_create_account(&Backtrace::new()))
+        {
+            return Ok(None);
+        }
+        let account = get_account_list().into_iter().find(|acc| acc.id == id);
+        Ok(account)
+    }
+
+    async fn create_account(&self, _pool: &SqlitePool, _account: &Account) -> sqlx::Result<u64> {
+        if self.error_on_create {
+            return Err(sqlx::Error::RowNotFound);
+        }
+        if self.create_return_empty {
+            return Ok(0);
+        }
+        Ok(1)
+    }
+
+    async fn update_account(&self, _pool: &SqlitePool, _account: &Account) -> sqlx::Result<u64> {
+        if self.error_on_update {
+            return Err(sqlx::Error::RowNotFound);
+        }
+        if self.update_return_empty {
+            return Ok(0);
+        }
+        Ok(1)
+    }
+
+    async fn delete_account(&self, _pool: &SqlitePool, _id: &str) -> sqlx::Result<u64> {
+        if self.error_on_delete {
+            return Err(sqlx::Error::RowNotFound);
+        }
+        if self.delete_return_empty {
+            return Ok(0);
+        }
+        Ok(1)
     }
 }
