@@ -369,46 +369,106 @@ impl AccountHandler for AccountHandlerImpl {
 mod tests {
     use super::*;
     use crate::utils::unit_test::fixtures::accounts as fixtures_accounts;
+    use crate::utils::unit_test::fixtures::accounts::{
+        ParametrizedMockAccountDaoImpl, ParametrizedMockAccountDaoImplParameters,
+    };
+    use crate::utils::unit_test::fixtures::app_test_setup::TestAppModule;
     use crate::utils::unit_test::fixtures::db as fixtures_db;
     use actix_web::body::to_bytes;
     use actix_web::http::StatusCode;
-    use actix_web::web;
-    use once_cell::sync::Lazy;
 
-    static APP_MODULE: Lazy<AppModule> = Lazy::new(|| AppModule::builder().build());
-    static HANDLER: Lazy<Arc<dyn AccountHandler>> = Lazy::new(|| {
-        let handler: Arc<dyn AccountHandler> = APP_MODULE.resolve();
-        handler
-    });
-
-    async fn setup() -> (web::Data<SqlitePool>, Arc<dyn AccountHandler>) {
-        let (pool, _handler) = setup_empty().await;
-        fixtures_accounts::insert_test_account(&pool).await;
-        (pool, HANDLER.clone())
-    }
-
-    async fn setup_empty() -> (web::Data<SqlitePool>, Arc<dyn AccountHandler>) {
-        let pool = web::Data::new(fixtures_db::create_test_db().await);
-        (pool, HANDLER.clone())
-    }
-
-    async fn setup_undefined() -> (web::Data<SqlitePool>, Arc<dyn AccountHandler>) {
+    async fn setup(
+        parameters: ParametrizedMockAccountDaoImplParameters,
+    ) -> (web::Data<SqlitePool>, Arc<dyn AccountHandler>) {
         let pool = web::Data::new(fixtures_db::create_undefined_db().await);
-        (pool, HANDLER.clone())
+        let add_module =
+            TestAppModule::builder().with_component_parameters::<ParametrizedMockAccountDaoImpl>(parameters).build();
+        (pool, add_module.resolve())
+    }
+
+    pub fn get_normal_params() -> ParametrizedMockAccountDaoImplParameters {
+        ParametrizedMockAccountDaoImplParameters {
+            error_on_create: false,
+            error_on_get: false,
+            error_on_update: false,
+            error_on_delete: false,
+            get_return_empty: false,
+            get_in_create_return_empty: true,
+            create_return_empty: false,
+            update_return_empty: false,
+            delete_return_empty: false,
+        }
+    }
+
+    pub fn get_exists_account_params() -> ParametrizedMockAccountDaoImplParameters {
+        ParametrizedMockAccountDaoImplParameters {
+            error_on_create: false,
+            error_on_get: false,
+            error_on_update: false,
+            error_on_delete: false,
+            get_return_empty: false,
+            get_in_create_return_empty: false,
+            create_return_empty: false,
+            update_return_empty: false,
+            delete_return_empty: false,
+        }
+    }
+
+    pub fn get_empty_params() -> ParametrizedMockAccountDaoImplParameters {
+        ParametrizedMockAccountDaoImplParameters {
+            error_on_create: false,
+            error_on_get: false,
+            error_on_update: false,
+            error_on_delete: false,
+            get_return_empty: true,
+            get_in_create_return_empty: true,
+            create_return_empty: true,
+            update_return_empty: true,
+            delete_return_empty: true,
+        }
+    }
+
+    pub fn get_error_params() -> ParametrizedMockAccountDaoImplParameters {
+        ParametrizedMockAccountDaoImplParameters {
+            error_on_create: true,
+            error_on_get: true,
+            error_on_update: true,
+            error_on_delete: true,
+            get_return_empty: false,
+            get_in_create_return_empty: true,
+            create_return_empty: false,
+            update_return_empty: false,
+            delete_return_empty: false,
+        }
+    }
+
+    pub fn get_error_on_creation_params() -> ParametrizedMockAccountDaoImplParameters {
+        ParametrizedMockAccountDaoImplParameters {
+            error_on_create: true,
+            error_on_get: false,
+            error_on_update: true,
+            error_on_delete: true,
+            get_return_empty: false,
+            get_in_create_return_empty: true,
+            create_return_empty: false,
+            update_return_empty: false,
+            delete_return_empty: false,
+        }
     }
 
     mod create_account {
+
         use super::*;
 
         #[tokio::test]
         async fn create_success() {
             // preparation
-            let (pool, _handler) = setup_empty().await;
+            let (pool, _handler) = setup(get_normal_params()).await;
             let new_account = fixtures_accounts::get_first_account();
             let new_account_json = web::Json(new_account.clone());
             // execution
             let resp = _handler.create_account(pool, new_account_json).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::CREATED);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -418,12 +478,12 @@ mod tests {
         #[tokio::test]
         async fn create_conflict() {
             // preparation
-            let (pool, _handler) = setup().await;
+            let (pool, _handler) = setup(get_exists_account_params()).await;
             let existing_account = fixtures_accounts::get_first_account();
             let existing_account_json = web::Json(existing_account.clone());
             // execution
             let resp = _handler.create_account(pool, existing_account_json).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::CONFLICT);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -433,12 +493,12 @@ mod tests {
         #[tokio::test]
         async fn create_servererror_on_check_exists() {
             // preparation
-            let (pool, _handler) = setup_undefined().await;
+            let (pool, _handler) = setup(get_error_params()).await;
             let new_account = fixtures_accounts::get_first_account();
             let new_account_json = web::Json(new_account.clone());
             // execution
             let resp = _handler.create_account(pool, new_account_json).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -446,20 +506,20 @@ mod tests {
         }
 
         // TODO: モックを使えるようになってから
-        // #[tokio::test]
-        // async fn create_servererror_on_creation() {
-        //     // preparation
-        //     let (pool, app_module, _handler) = setup().await;
-        //     let new_account = fixtures_accounts::get_first_account();
-        //     let new_account_json = web::Json(new_account.clone());
-        //     // execution
-        //     let resp = _handler.create_account(pool, app_module, new_account_json).await.unwrap();
-        //     // assersion
-        //     assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
-        //     let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-        //     let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-        //     assert_eq!(body, json!({"error": "Failed to create account."}));
-        // }
+        #[tokio::test]
+        async fn create_servererror_on_creation() {
+            // preparation
+            let (pool, _handler) = setup(get_error_on_creation_params()).await;
+            let new_account = fixtures_accounts::get_first_account();
+            let new_account_json = web::Json(new_account.clone());
+            // execution
+            let resp = _handler.create_account(pool, new_account_json).await.unwrap();
+            // assertion
+            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+            assert_eq!(body, json!({"error": "Failed to create account."}));
+        }
     }
 
     mod get_accounts_list_all {
@@ -468,10 +528,10 @@ mod tests {
         #[tokio::test]
         async fn get_all_is_empty() {
             // preparation
-            let (pool, _handler) = setup_empty().await;
+            let (pool, _handler) = setup(get_empty_params()).await;
             // execution
             let resp = _handler.get_accounts_list_all(pool).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let accounts: Vec<Account> = serde_json::from_slice(&body_bytes).unwrap();
@@ -481,11 +541,11 @@ mod tests {
         #[tokio::test]
         async fn get_all_found_3accounts() {
             // preparation
-            let (pool, _handler) = setup().await;
+            let (pool, _handler) = setup(get_normal_params()).await;
             let account_list = fixtures_accounts::get_sorted_account_list();
             // execution
             let resp = _handler.get_accounts_list_all(pool).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let accounts: Vec<Account> = serde_json::from_slice(&body_bytes).unwrap();
@@ -498,10 +558,10 @@ mod tests {
         #[tokio::test]
         async fn get_all_servererror() {
             // preparation
-            let (pool, _handler) = setup_undefined().await;
+            let (pool, _handler) = setup(get_error_params()).await;
             // execution
             let resp = _handler.get_accounts_list_all(pool).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -515,11 +575,11 @@ mod tests {
         #[tokio::test]
         async fn get_type_not_found() {
             // preparation
-            let (pool, _handler) = setup().await;
+            let (pool, _handler) = setup(get_empty_params()).await;
             let path = web::Path::from("Other".to_string());
             // execution
             let resp = _handler.get_accounts_list_by_type(pool, path).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -529,12 +589,12 @@ mod tests {
         #[tokio::test]
         async fn get_type_found() {
             // preparation
-            let (pool, _handler) = setup().await;
+            let (pool, _handler) = setup(get_normal_params()).await;
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.account_type.name.clone());
             // execution
             let resp = _handler.get_accounts_list_by_type(pool, path).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let accounts: Vec<Account> = serde_json::from_slice(&body_bytes).unwrap();
@@ -545,12 +605,12 @@ mod tests {
         #[tokio::test]
         async fn get_type_servererror() {
             // preparation
-            let (pool, _handler) = setup_undefined().await;
+            let (pool, _handler) = setup(get_error_params()).await;
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.account_type.name.clone());
             // execution
             let resp = _handler.get_accounts_list_by_type(pool, path).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -564,11 +624,11 @@ mod tests {
         #[tokio::test]
         async fn get_by_id_not_found() {
             // preparation
-            let (pool, _handler) = setup().await;
+            let (pool, _handler) = setup(get_empty_params()).await;
             let path = web::Path::from("nonexistent_id".to_string());
             // execution
             let resp = _handler.get_account_by_id(pool, path).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -578,12 +638,12 @@ mod tests {
         #[tokio::test]
         async fn get_by_id_found() {
             // preparation
-            let (pool, _handler) = setup().await;
+            let (pool, _handler) = setup(get_normal_params()).await;
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.id.clone());
             // execution
             let resp = _handler.get_account_by_id(pool, path).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let fetched_account: Account = serde_json::from_slice(&body_bytes).unwrap();
@@ -593,11 +653,11 @@ mod tests {
         #[tokio::test]
         async fn get_by_id_servererror() {
             // preparation
-            let (pool, _handler) = setup_undefined().await;
+            let (pool, _handler) = setup(get_error_params()).await;
             let path = web::Path::from("any_id".to_string());
             // execution
             let resp = _handler.get_account_by_id(pool, path).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -611,11 +671,11 @@ mod tests {
         #[tokio::test]
         async fn delete_not_found() {
             // preparation
-            let (pool, _handler) = setup().await;
+            let (pool, _handler) = setup(get_empty_params()).await;
             let path = web::Path::from("nonexistent_id".to_string());
             // execution
             let resp = _handler.delete_account(pool, path).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -625,23 +685,23 @@ mod tests {
         #[tokio::test]
         async fn delete_success() {
             // preparation
-            let (pool, _handler) = setup().await;
+            let (pool, _handler) = setup(get_normal_params()).await;
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.id.clone());
             // execution
             let resp = _handler.delete_account(pool, path).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::NO_CONTENT);
         }
 
         #[tokio::test]
         async fn delete_servererror() {
             // preparation
-            let (pool, _handler) = setup_undefined().await;
+            let (pool, _handler) = setup(get_error_params()).await;
             let path = web::Path::from("any_id".to_string());
             // execution
             let resp = _handler.delete_account(pool, path).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -655,12 +715,12 @@ mod tests {
         #[tokio::test]
         async fn update_not_found() {
             // preparation
-            let (pool, _handler) = setup().await;
+            let (pool, _handler) = setup(get_empty_params()).await;
             let account = fixtures_accounts::create_new_account();
             let account_json = web::Json(account);
             // execution
             let resp = _handler.update_account(pool, account_json).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::NOT_FOUND);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -670,13 +730,13 @@ mod tests {
         #[tokio::test]
         async fn update_success() {
             // preparation
-            let (pool, _handler) = setup().await;
+            let (pool, _handler) = setup(get_normal_params()).await;
             let mut account = fixtures_accounts::get_first_account();
             account.memo = Some("更新されたメモ".to_string());
             let account_json = web::Json(account.clone());
             // execution
             let resp = _handler.update_account(pool, account_json).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::OK);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
@@ -686,12 +746,12 @@ mod tests {
         #[tokio::test]
         async fn update_servererror() {
             // preparation
-            let (pool, _handler) = setup_undefined().await;
+            let (pool, _handler) = setup(get_error_params()).await;
             let account = fixtures_accounts::get_first_account();
             let account_json = web::Json(account);
             // execution
             let resp = _handler.update_account(pool, account_json).await.unwrap();
-            // assersion
+            // assertion
             assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
             let body_bytes = to_bytes(resp.into_body()).await.unwrap();
             let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
