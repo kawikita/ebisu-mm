@@ -1,11 +1,10 @@
 use crate::common::fixtures::accounts as fixtures_accounts;
 use crate::common::fixtures::db as fixtures_db;
 use actix_web::dev::ServiceResponse;
-use actix_web::http::StatusCode;
-use actix_web::{App, test, web};
+use actix_web::{App, http::StatusCode, test, web};
 use ebisu_api::entity::accounts::Account;
 use ebisu_api::handler::accounts::set_route as accounts_configure;
-use ebisu_api::utils::app_setup::create_app_data;
+use ebisu_api::utils::app_setup::AppModule;
 use serde_json::json;
 use sqlx::{Pool, Sqlite};
 use std::vec;
@@ -26,8 +25,14 @@ async fn call_api(
     api_path: &str,
     send_body: Option<&Account>,
 ) -> ServiceResponse {
-    let app_data = create_app_data(&pool);
-    let app = test::init_service(App::new().app_data(web::Data::new(app_data)).configure(accounts_configure)).await;
+    let app_module = AppModule::builder().build();
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(pool.clone()))
+            .app_data(web::Data::new(app_module))
+            .configure(accounts_configure),
+    )
+    .await;
     let req = {
         match method {
             HttpMethod::GET => test::TestRequest::get().uri(api_path).to_request(),
@@ -44,7 +49,7 @@ mod get_account {
     use super::*;
 
     #[actix_web::test]
-    pub async fn get_all_is_empty() {
+    pub async fn returns_200_empty() {
         // preparation
         let pool = fixtures_db::create_empty_db().await;
         // execution
@@ -57,7 +62,7 @@ mod get_account {
     }
 
     #[actix_web::test]
-    pub async fn get_all_found_3accounts() {
+    pub async fn returns_200_found_3accounts() {
         // preparation
         let pool = fixtures_db::create_test_db().await;
         let accounts = fixtures_accounts::get_sorted_account_list();
@@ -74,7 +79,7 @@ mod get_account {
     }
 
     #[actix_web::test]
-    pub async fn get_all_server_error() {
+    pub async fn returns_500_server_error() {
         let pool = fixtures_db::create_undefined_db().await;
         // execution
         let api_path = API_BASE_PATH;
@@ -90,7 +95,7 @@ mod get_account_type {
     use super::*;
 
     #[actix_web::test]
-    pub async fn get_type_is_found() {
+    pub async fn returns_200_found_by_type() {
         // preparation
         let pool = fixtures_db::create_test_db().await;
         let account = fixtures_accounts::get_first_account();
@@ -105,7 +110,7 @@ mod get_account_type {
     }
 
     #[actix_web::test]
-    pub async fn get_type_not_found() {
+    pub async fn returns_404_not_found() {
         // preparation
         let pool = fixtures_db::create_test_db().await;
         // execution
@@ -118,7 +123,7 @@ mod get_account_type {
     }
 
     #[actix_web::test]
-    pub async fn get_type_server_error() {
+    pub async fn returns_500_server_error() {
         let pool = fixtures_db::create_undefined_db().await;
         let account = fixtures_accounts::get_first_account();
         let encoded_type: String = url::form_urlencoded::byte_serialize(account.account_type.name.as_bytes()).collect();
@@ -136,7 +141,7 @@ mod get_account_id {
     use super::*;
 
     #[actix_web::test]
-    pub async fn get_id_is_found() {
+    pub async fn returns_200_found_by_id() {
         // preparation
         let pool = fixtures_db::create_test_db().await;
         let account_id = fixtures_accounts::get_first_account().id;
@@ -150,7 +155,7 @@ mod get_account_id {
     }
 
     #[actix_web::test]
-    pub async fn get_id_not_found() {
+    pub async fn returns_404_not_found() {
         // preparation
         let pool = fixtures_db::create_test_db().await;
         let account_id = "55555555-5555-5555-5555-555555555555".to_string();
@@ -164,7 +169,7 @@ mod get_account_id {
     }
 
     #[actix_web::test]
-    pub async fn get_id_server_error() {
+    pub async fn returns_500_server_error() {
         let pool = fixtures_db::create_undefined_db().await;
         let account_id = fixtures_accounts::get_first_account().id;
         // execution
@@ -181,7 +186,7 @@ mod post_account {
     use super::*;
 
     #[actix_web::test]
-    pub async fn create_account_success() {
+    pub async fn returns_201_created() {
         // preparation and execution
         let pool = fixtures_db::create_empty_db().await;
         let new_account = fixtures_accounts::create_new_account();
@@ -195,7 +200,7 @@ mod post_account {
     }
 
     #[actix_web::test]
-    pub async fn create_account_deprecated() {
+    pub async fn returns_409_conflict() {
         // preparation and execution
         let pool = fixtures_db::create_empty_db().await;
         let new_account = fixtures_accounts::create_new_account();
@@ -210,7 +215,7 @@ mod post_account {
     }
 
     #[actix_web::test]
-    pub async fn create_server_error() {
+    pub async fn returns_500_server_error() {
         let pool = fixtures_db::create_undefined_db().await;
         let new_account = fixtures_accounts::create_new_account();
         // execution
@@ -228,7 +233,7 @@ mod delete_account {
     use super::*;
 
     #[actix_web::test]
-    pub async fn delete_account_success() {
+    pub async fn returns_204_no_content() {
         // preparation
         let pool = fixtures_db::create_test_db().await;
         let account = fixtures_accounts::get_first_account();
@@ -240,7 +245,7 @@ mod delete_account {
     }
 
     #[actix_web::test]
-    pub async fn delete_account_not_found() {
+    pub async fn returns_404_not_found() {
         // preparation
         let pool = fixtures_db::create_empty_db().await;
         fixtures_accounts::insert_test_account(&pool).await;
@@ -255,7 +260,7 @@ mod delete_account {
     }
 
     #[actix_web::test]
-    pub async fn delete_server_error() {
+    pub async fn returns_500_server_error() {
         let pool = fixtures_db::create_undefined_db().await;
         let account_id = fixtures_accounts::get_first_account().id;
         // execution
@@ -273,7 +278,7 @@ mod put_account {
     use tokio::time::{Duration, sleep};
 
     #[actix_web::test]
-    pub async fn update_account_success() {
+    pub async fn returns_200_ok_update_account() {
         // preparation
         let pool = fixtures_db::create_test_db().await;
         let before = fixtures_accounts::get_first_account();
@@ -302,7 +307,7 @@ mod put_account {
     }
 
     #[actix_web::test]
-    pub async fn update_account_not_found() {
+    pub async fn returns_404_not_found() {
         // preparation
         let pool = fixtures_db::create_test_db().await;
         let update_account = fixtures_accounts::create_new_account();
@@ -316,7 +321,7 @@ mod put_account {
     }
 
     #[actix_web::test]
-    pub async fn update_server_error() {
+    pub async fn returns_500_server_error() {
         let pool = fixtures_db::create_undefined_db().await;
         let update_account = fixtures_accounts::create_new_account();
         // execution
