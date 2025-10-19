@@ -5,11 +5,16 @@ use uuid::Uuid;
 
 const MIGRATIONS_DIR: &str = "./migrations";
 
-// テスト用のインメモリSQLiteデータベースをセットアップするヘルパー関数
+/// テスト用のインメモリSQLiteデータベースをセットアップするヘルパー関数
+///
+/// # Returns:
+///   SqlitePool - マイグレーションが適用されたSQLite接続プール
+/// # Panics
+///   マイグレーションの適用に失敗した場合、パニックします。
 pub async fn create_test_db() -> SqlitePool {
     let db_name = format!("file:memdb-{}", Uuid::new_v4().to_string());
     let db_url = format!("{}?mode=memory&cache=shared", db_name);
-    let pool = SqlitePoolOptions::new().max_connections(1).connect(&db_url).await.unwrap();
+    let pool = SqlitePoolOptions::new().connect(&db_url).await.unwrap();
     let mut conn = pool.acquire().await.unwrap();
     // マイグレーションファイルを読み込み、順番に実行する
     let mut migration_paths: Vec<_> = fs::read_dir(MIGRATIONS_DIR)
@@ -29,7 +34,11 @@ pub async fn create_test_db() -> SqlitePool {
     pool
 }
 
-// スキーマが設定されていないDBへのアクセスプールを作成する
+/// スキーマが設定されていないDBへのアクセスプールを作成する
+/// # Returns:
+///   SqlitePool - スキーマが設定されていないSQLite接続プール
+/// # Panics
+///   接続プールの作成に失敗した場合、パニックします。
 pub async fn create_undefined_db() -> SqlitePool {
     let db_name = format!("file:memdb-{}", Uuid::new_v4().to_string());
     let db_url = format!("{}?mode=memory&cache=shared", db_name);

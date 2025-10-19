@@ -11,20 +11,24 @@ use ebisu_api::utils::{
 };
 use log::info;
 
+/// Ebisu APIサーバーのメイン関数
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
+        // OpenAPI JSONエクスポートサブコマンド
         Some(Commands::Export { file }) => {
             exporter::export_openapi_json(&file).expect("Failed to export OpenAPI JSON");
             println!("OpenAPI JSON exported to {}", file);
             return Ok(());
         },
+        // バージョン表示サブコマンド
         Some(Commands::Version { verbose }) => {
             version::show_version(*verbose);
             return Ok(());
         },
+        // サブコマンドなしはサーバー起動
         None => {
             dotenv().ok();
             logging::init_logger();

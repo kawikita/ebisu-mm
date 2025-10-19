@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use utoipa::ToSchema;
 
-/// 口座種別を表す構造体。
+/// 口座種別を表す構造体 accounts_typeテーブルの1レコードに対応
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq, Eq, Clone, ToSchema)]
 pub struct AccountType {
     /// [必須]口座種別のユニークな識別子
@@ -11,7 +11,7 @@ pub struct AccountType {
     pub name: String,
 }
 
-/// 口座情報を表す構造体。accountsテーブルの1レコードに対応。
+/// 口座情報を表す構造体 accountsテーブルの1レコードに対応
 #[derive(Debug, Serialize, Deserialize, FromRow, PartialEq, Eq, Clone, ToSchema)]
 pub struct Account {
     /// [必須]口座のユニークな識別子(UUID)
