@@ -22,7 +22,7 @@ module! {
 }
 
 /// ルートエントリーポイントのルーティング設定関数
-pub fn set_route(cfg: &mut web::ServiceConfig) {
+fn set_route(cfg: &mut web::ServiceConfig) {
     debug!("Setting up root route configuration.");
     cfg.service(web::resource("/").route(web::get().to(index)));
     debug!("Root route configuration set up successfully.");

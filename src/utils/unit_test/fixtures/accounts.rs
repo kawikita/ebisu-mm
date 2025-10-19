@@ -6,6 +6,7 @@ use serde::Deserialize;
 use shaku::Component;
 use sqlx::SqlitePool;
 use std::fs;
+use std::sync::Arc;
 
 const TEST_ACCOUNT_DATA_PATH: &str = "./tests/data/accounts.yaml";
 
@@ -23,7 +24,10 @@ struct YamlAccountType {
     name: String,
 }
 
-// テスト用に口座情報を追加するヘルパー関数
+/// テスト用に口座情報を追加するヘルパー関数
+/// # Arguments
+/// * `pool` - Sqliteのコネクションプール
+/// * `account_row` - 追加する口座情報
 pub async fn insert_account(pool: &SqlitePool, account_row: &Account) {
     sqlx::query!(
         "INSERT INTO accounts
@@ -38,14 +42,18 @@ pub async fn insert_account(pool: &SqlitePool, account_row: &Account) {
     .unwrap();
 }
 
-// テスト用口座種別を挿入するヘルパー関数
+/// テスト用口座種別を挿入するヘルパー関数
+/// # Arguments
+/// * `pool` - Sqliteのコネクションプール
 pub async fn insert_test_account(pool: &SqlitePool) {
     for account in load_accounts_from_yaml() {
         insert_account(pool, &account).await;
     }
 }
 
-// YAMLファイルからテスト用口座情報を読み込むヘルパー関数
+/// YAMLファイルからテスト用口座情報を読み込むヘルパー関数
+/// # Returns
+/// * `Vec<Account>` - 読み込んだ口座情報のベクトル
 pub fn load_accounts_from_yaml() -> Vec<Account> {
     let yaml_str = fs::read_to_string(TEST_ACCOUNT_DATA_PATH).expect("Failed to read YAML file");
     let yaml_accounts: Vec<YamlAccount> = serde_yaml::from_str(&yaml_str).expect("Failed to parse YAML");
@@ -65,24 +73,32 @@ pub fn load_accounts_from_yaml() -> Vec<Account> {
         .collect()
 }
 
-// テスト用口座リストを取得するヘルパー関数
+/// テスト用口座リストを取得するヘルパー関数
+/// # Returns
+/// * `Vec<Account>` - 口座情報のベクトル
 pub fn get_account_list() -> Vec<Account> {
     load_accounts_from_yaml()
 }
 
-// 名前順にソートされたテスト用口座リストを取得するヘルパー関数
+/// 名前順にソートされたテスト用口座リストを取得するヘルパー関数
+/// # Returns
+/// * `Vec<Account>` - 名前順にソートされた口座情報のベクトル
 pub fn get_sorted_account_list() -> Vec<Account> {
     let mut accounts = load_accounts_from_yaml();
     accounts.sort_by(|a, b| a.name.cmp(&b.name));
     accounts
 }
 
-// テスト用のソート済みのリストの最初の口座を取得するヘルパー関数
+/// テスト用のソート済みのリストの最初の口座を取得するヘルパー関数
+/// # Returns
+/// * `Account` - 最初の口座情報
 pub fn get_first_account() -> Account {
     get_sorted_account_list().first().unwrap().clone()
 }
 
-// 追加用の新しい口座データを作成するヘルパー関数
+/// 追加用の新しい口座データを作成するヘルパー関数
+/// # Returns
+/// * `Account` - 新しい口座情報
 pub fn create_new_account() -> Account {
     Account {
         id: "44444444-4444-4444-4444-444444444444".to_string(),
@@ -99,7 +115,6 @@ pub fn create_new_account() -> Account {
 
 // モックで呼び出し元がcreate_account関数かどうかを判定するヘルパー関数
 fn is_called_from_create_account(bt: &Backtrace) -> bool {
-    let called_from_create_account = false;
     for frame in bt.frames() {
         for symbol in frame.symbols() {
             if let Some(name) = symbol.name() {
@@ -109,13 +124,11 @@ fn is_called_from_create_account(bt: &Backtrace) -> bool {
             }
         }
     }
-    called_from_create_account
+    false
 }
 
-/// テスト用のAccountDaoモック(正常系)
-#[derive(Clone, Component)]
-#[shaku(interface = AccountDao)]
-pub struct ParametrizedMockAccountDaoImpl {
+#[derive(Clone, Debug)]
+pub struct MockConfig {
     pub error_on_create: bool,
     pub error_on_get: bool,
     pub error_on_update: bool,
@@ -127,13 +140,31 @@ pub struct ParametrizedMockAccountDaoImpl {
     pub delete_return_empty: bool,
 }
 
+/// テスト用のAccountDaoモックのパラメータ化実装構造体
+/// # Fields
+/// * `error_on_create` - createでエラーを発生させるか
+/// * `error_on_get` - getでエラーを発生させるか
+/// * `error_on_update` - updateでエラーを発生させるか
+/// * `error_on_delete` - deleteでエラーを発生させるか
+/// * `get_return_empty` - getで空の結果を返すか
+/// * `get_in_create_return_empty` - create_accountからのget_account_by_idで空の結果を返すか
+/// * `create_return_empty` - createで空の結果を返すか
+/// * `update_return_empty` - updateで空の結果を返すか
+/// * `delete_return_empty` - deleteで空の結果を返すか
+#[derive(Clone, Component)]
+#[shaku(interface = AccountDao)]
+pub struct ParametrizedMockAccountDaoImpl {
+    pub config: Arc<MockConfig>,
+}
+
+/// テスト用のAccountDaoトレイトのモックの実装
 #[async_trait::async_trait]
 impl AccountDao for ParametrizedMockAccountDaoImpl {
     async fn get_accounts_list_all(&self, _pool: &SqlitePool) -> sqlx::Result<Vec<Account>> {
-        if self.error_on_get {
+        if self.config.error_on_get {
             return Err(sqlx::Error::RowNotFound);
         }
-        if self.get_return_empty {
+        if self.config.get_return_empty {
             return Ok(vec![]);
         }
         Ok(get_sorted_account_list())
@@ -144,10 +175,10 @@ impl AccountDao for ParametrizedMockAccountDaoImpl {
         _pool: &SqlitePool,
         account_type_name: &str,
     ) -> sqlx::Result<Vec<Account>> {
-        if self.error_on_get {
+        if self.config.error_on_get {
             return Err(sqlx::Error::RowNotFound);
         }
-        if self.get_return_empty {
+        if self.config.get_return_empty {
             return Ok(vec![]);
         }
         let accounts: Vec<Account> =
@@ -156,11 +187,11 @@ impl AccountDao for ParametrizedMockAccountDaoImpl {
     }
 
     async fn get_account_by_id(&self, _pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Account>> {
-        if self.error_on_get {
+        if self.config.error_on_get {
             return Err(sqlx::Error::RowNotFound);
         }
-        if self.get_return_empty
-            || (self.get_in_create_return_empty && is_called_from_create_account(&Backtrace::new()))
+        if self.config.get_return_empty
+            || (self.config.get_in_create_return_empty && is_called_from_create_account(&Backtrace::new()))
         {
             return Ok(None);
         }
@@ -169,30 +200,30 @@ impl AccountDao for ParametrizedMockAccountDaoImpl {
     }
 
     async fn create_account(&self, _pool: &SqlitePool, _account: &Account) -> sqlx::Result<u64> {
-        if self.error_on_create {
+        if self.config.error_on_create {
             return Err(sqlx::Error::RowNotFound);
         }
-        if self.create_return_empty {
+        if self.config.create_return_empty {
             return Ok(0);
         }
         Ok(1)
     }
 
     async fn update_account(&self, _pool: &SqlitePool, _account: &Account) -> sqlx::Result<u64> {
-        if self.error_on_update {
+        if self.config.error_on_update {
             return Err(sqlx::Error::RowNotFound);
         }
-        if self.update_return_empty {
+        if self.config.update_return_empty {
             return Ok(0);
         }
         Ok(1)
     }
 
     async fn delete_account(&self, _pool: &SqlitePool, _id: &str) -> sqlx::Result<u64> {
-        if self.error_on_delete {
+        if self.config.error_on_delete {
             return Err(sqlx::Error::RowNotFound);
         }
-        if self.delete_return_empty {
+        if self.config.delete_return_empty {
             return Ok(0);
         }
         Ok(1)

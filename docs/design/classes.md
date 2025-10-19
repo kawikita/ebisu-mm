@@ -3,15 +3,15 @@
 ' Ebisu API クラス図 (src配下)
 
 package ebisu_api {
-  ' モデル
-  package model {
+  ' エンティティ
+  package entity {
     package accounts {
-      entity AccountType{
+      class AccountType {
         +id: i64
         +name: String
       }
 
-      entity Account {
+      class Account {
         +id: String
         +name: String
         +account_type: AccountType
@@ -56,17 +56,72 @@ package ebisu_api {
     }
   }
 
-  ' AppData (DI用)
-  class AppData {
-    +db_pool: SqlitePool
-    +account_dao: AccountDaoImpl
+  package utils {
+    package app_setup as AppSetupModule {
+      ' AppModule (DI用)
+      struct AppModule {
+        +account_dao: AccountDao (dyn)
+      }
+    }
+    class app_setup {
+      +set_route()
+      -set_route_config()
+    }
+    app_setup -> AppModule
+
+    class exporter {
+      +export_openapi_json()
+    }
+    class logging {
+      +init_logger()
+    }
+    package message as MessagePkg {
+      interface MessageHierarchy {
+        +get()
+        +get_fmt()
+      }
+    }
+    class message {
+      -load_messages()
+      -get_messages_()
+      +set_hierarchy()
+      +msg_map!()
+    }
+    message -- MessageHierarchy
+
+    package options {
+      struct Cli {
+        +command
+      }
+      enum Commands {
+        Export
+        Version
+      }
+    }
+    class versions {
+      +show_version()
+      +show_version_with_verbose()
+    }
+  }
+
+  class main {
+    -main()
   }
 
   ' 関連
   Account --> AccountType
-  AppData --> AccountDaoImpl
+  AccountHandlerImpl --> Account
+  AccountDaoImpl --> Account
+  AccountHandlerImpl --> message
 
-  main --> AppData
+  AppModule --> AccountHandler
+  AppModule --> AccountDao
+  main --> app_setup
+  main --> exporter
+  main --> options
+  main --> logging
+  main --> versions
+
 }
 
 @enduml

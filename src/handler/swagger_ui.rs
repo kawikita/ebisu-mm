@@ -7,6 +7,9 @@ use utoipa_swagger_ui::SwaggerUi;
 
 const API_BASE_PATH: &str = "/api/docs/{_:.*}";
 
+/// Swagger UIのルート設定関数
+/// # Arguments
+/// * `cfg` - Actix-webのサービス設定オブジェクト
 pub fn set_route(cfg: &mut web::ServiceConfig) {
     debug!("Setting up Swagger UI route configurations.");
     cfg.service(SwaggerUi::new(API_BASE_PATH).url("/api/openapi.json", ApiDoc::openapi()));
@@ -14,11 +17,13 @@ pub fn set_route(cfg: &mut web::ServiceConfig) {
     debug!("Swagger UI route configurations set up successfully.");
 }
 
+/// OpenAPI仕様書をJSON形式で返すハンドラー関数
 #[get("/api/openapi.json")]
 pub async fn openapi_json() -> Result<HttpResponse, actix_web::Error> {
     Ok(HttpResponse::Ok().json(ApiDoc::openapi()))
 }
 
+/// APIドキュメントのOpenAPI仕様を定義する構造体
 #[derive(OpenApi)]
 #[openapi(
     paths(

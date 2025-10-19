@@ -1,7 +1,6 @@
-/// アプリケーションのコマンドオプションのパーサー
-/// アプリケーションのコマンドオプションを格納する構造体
 use clap::{Parser, Subcommand};
 
+/// コマンドライン引数をパースするための構造体
 #[derive(Parser)]
 #[command(name = "Ebisu API")]
 #[command(about = "Ebisu API Server", long_about = None)]
@@ -10,6 +9,7 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
+/// コマンドライン引数のサブコマンドを表す列挙型
 #[derive(Subcommand)]
 pub enum Commands {
     #[command(about = "Export OpenAPI specification in JSON format")]

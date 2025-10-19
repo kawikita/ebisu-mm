@@ -10,20 +10,28 @@ include!(concat!(env!("OUT_DIR"), "/messages_embedded.rs"));
 
 static MESSAGES: OnceCell<Value> = OnceCell::new();
 
+// YAMLメッセージをパースして返すヘルパー関数
 fn load_messages() -> Value {
     serde_yaml::from_str(MESSAGES_YAML).expect("Failed to parse embedded messages.yaml")
 }
 
+// メッセージルートノードを取得するヘルパー関数
 fn get_messages_root() -> &'static Value {
     MESSAGES.get_or_init(load_messages)
 }
 
+/// メッセージ階層を表す構造体
 pub struct MessageHierarchy<'a> {
     node: &'a Value,
 }
 
+/// メッセージ階層に対応したメッセージを返すメソッド群
 impl<'a> MessageHierarchy<'a> {
     /// メッセージを取得。未定義時は空文字列＋エラーログ
+    /// # Arguments
+    /// * `key` - メッセージキー
+    /// # Returns
+    /// メッセージ文字列への参照。未定義時は空文字列への参照＋エラーログ
     pub fn get(&self, key: &str) -> &str {
         match self.node.get(key).and_then(|v| v.as_str()) {
             Some(s) => s,
@@ -35,6 +43,11 @@ impl<'a> MessageHierarchy<'a> {
     }
 
     /// テンプレート文字列にstrfmtで埋め込み。失敗時は空文字＋エラーログ
+    /// # Arguments
+    /// * `key` - メッセージキー
+    /// * `vars` - 埋め込み変数のマップ
+    /// # Returns
+    /// フォーマット済みメッセージ文字列。失敗時は空文字＋エラーログ
     pub fn get_fmt(&self, key: &str, vars: &HashMap<String, String>) -> String {
         let template = self.get(key);
         match strfmt(template, vars) {
@@ -49,6 +62,10 @@ impl<'a> MessageHierarchy<'a> {
 
 /// module_path!() で与えられたパスに対応するメッセージサブツリーを返す。
 /// 階層のYAMLが存在しない場合panic。
+/// # Arguments
+/// * `module_path` - Rustのモジュールパス文字列
+/// # Returns
+/// * `MessageHierarchy` - メッセージ階層オブジェクト
 pub fn set_hierarchy(module_path: &str) -> MessageHierarchy<'_> {
     let root = get_messages_root();
     let mut node = root;
@@ -64,6 +81,7 @@ pub fn set_hierarchy(module_path: &str) -> MessageHierarchy<'_> {
     MessageHierarchy { node }
 }
 
+/// マクロで簡易的にメッセージマップを作成するヘルパーマクロ
 #[macro_export]
 macro_rules! msg_map {
     ( $( $k:expr => $v:expr ),* $(,)? ) => {{

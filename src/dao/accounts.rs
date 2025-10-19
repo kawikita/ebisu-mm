@@ -4,7 +4,7 @@ use shaku::{Component, Interface};
 use sqlx::{FromRow, Result, SqlitePool};
 use std::sync::Arc;
 
-/// 口座情報に関するデータアクセスオブジェクト(DAO)のトレイト定義。
+/// 口座情報に関するデータアクセスオブジェクト(DAO)のトレイト定義
 #[async_trait::async_trait]
 pub trait AccountDao: Interface {
     async fn get_accounts_list_all(&self, pool: &SqlitePool) -> Result<Vec<Account>>;
@@ -15,19 +15,23 @@ pub trait AccountDao: Interface {
     async fn delete_account(&self, pool: &SqlitePool, id: &str) -> Result<u64>;
 }
 
-/// AccountDaoトレイトの実装。
+/// AccountDaoトレイトの実装構造体
 #[derive(Clone, Component, Default)]
 #[shaku(interface = AccountDao)]
 pub struct AccountDaoImpl;
 
-/// AccountDaoImplのコンストラクタ
+/// AccountDaoImplのコンストラクタ実装
 impl AccountDaoImpl {
-    /// AccountDaoImplの新しいインスタンスを生成する。
+    /// AccountDaoImplの新しいインスタンスを生成する
+    /// # Returns
+    /// 新しいAccountDaoImplのインスタンス
     pub fn new() -> Self {
         Default::default()
     }
 
-    /// AccountDaoImplの新しいArcラップされたインスタンスを生成する。
+    /// AccountDaoImplの新しいArcラップされたインスタンスを生成する
+    /// # Returns
+    /// 新しいArcラップされたAccountDaoImplのインスタンス
     pub fn new_arc() -> Arc<dyn AccountDao + Send + Sync> {
         Arc::new(AccountDaoImpl)
     }
@@ -35,12 +39,10 @@ impl AccountDaoImpl {
 
 #[async_trait::async_trait]
 impl AccountDao for AccountDaoImpl {
-    /// すべての口座情報を取得する。
-    ///
-    /// # 引数
+    /// すべての口座情報を取得する
+    /// # Arguments
     /// * `pool` - データベース接続用のSqlitePool参照
-    ///
-    /// # 戻り値
+    /// # Returns
     /// * `Result<Vec<Account>>` - すべての口座情報のリスト。DBエラー時はErr。
     async fn get_accounts_list_all(&self, pool: &SqlitePool) -> Result<Vec<Account>> {
         info!("Fetching all accounts from database");
@@ -67,13 +69,11 @@ impl AccountDao for AccountDaoImpl {
         Ok(convert_iter_to_accounts(accounts_rows))
     }
 
-    /// 指定した口座種別に一致する口座情報一覧を取得する。
-    ///
-    /// # 引数
+    /// 指定した口座種別に一致する口座情報一覧を取得する
+    /// # Arguments
     /// * `pool` - データベース接続用のSqlitePool参照
     /// * `account_type` - 検索対象の口座種別名
-    ///
-    /// # 戻り値
+    /// # Returns
     /// * `Result<Vec<Account>>` - 該当する口座情報のリスト。DBエラー時はErr。
     async fn get_accounts_list_by_type(&self, pool: &SqlitePool, account_type_name: &str) -> Result<Vec<Account>> {
         info!("Fetching accounts with type '{}' from database", account_type_name);
@@ -102,13 +102,11 @@ impl AccountDao for AccountDaoImpl {
         Ok(convert_iter_to_accounts(accounts_rows))
     }
 
-    /// 指定したIDの口座情報を取得する。
-    ///
-    /// # 引数
+    /// 指定したIDの口座情報を取得する
+    /// # Arguments
     /// * `pool` - データベース接続用のSqlitePool参照
     /// * `id` - 取得したい口座のID（UUID文字列）
-    ///
-    /// # 戻り値
+    /// # Returns
     /// * `Result<Option<Account>>` - 該当口座があればSome(Account)、なければNone。DBエラー時はErr。
     async fn get_account_by_id(&self, pool: &SqlitePool, id: &str) -> Result<Option<Account>> {
         info!("Fetching account with ID '{}' from database", id);
@@ -136,13 +134,11 @@ impl AccountDao for AccountDaoImpl {
         Ok(account_row.map(|row| convert_row_to_object(&row)))
     }
 
-    /// 新しい口座情報を登録する。
-    ///
-    /// # 引数
+    /// 新しい口座情報を登録する
+    /// # Arguments
     /// * `pool` - データベース接続用のSqlitePool参照
     /// * `account` - 登録する口座情報（Account構造体）
-    ///
-    /// # 戻り値
+    /// # Returns
     /// * `Result<u64>` - 追加されたレコード数（通常は1）。DBエラー時はErr。
     async fn create_account(&self, pool: &SqlitePool, account: &Account) -> Result<u64> {
         info!("Creating new account: {:?}", account);
@@ -162,13 +158,11 @@ impl AccountDao for AccountDaoImpl {
         Ok(result.rows_affected())
     }
 
-    /// 既存の口座情報を更新する。
-    ///
-    /// # 引数
+    /// 既存の口座情報を更新する
+    /// # Arguments
     /// * `pool` - データベース接続用のSqlitePool参照
     /// * `account` - 更新する口座情報（Account構造体）
-    ///
-    /// # 戻り値
+    /// # Returns
     /// * `Result<u64>` - 更新されたレコード数（通常は1）。DBエラー時はErr。
     async fn update_account(&self, pool: &SqlitePool, account: &Account) -> Result<u64> {
         info!("Updating account: {:?}", account);
@@ -190,13 +184,11 @@ impl AccountDao for AccountDaoImpl {
         Ok(result.rows_affected())
     }
 
-    /// 指定したIDの口座情報を削除する。
-    ///
-    /// # 引数
+    /// 指定したIDの口座情報を削除する
+    /// # Arguments
     /// * `pool` - データベース接続用のSqlitePool参照
     /// * `id` - 削除したい口座のID（UUID文字列）
-    ///
-    /// # 戻り値
+    /// # Returns
     /// * `Result<u64>` - 削除されたレコード数（通常は1）。DBエラー時はErr。
     async fn delete_account(&self, pool: &SqlitePool, id: &str) -> Result<u64> {
         info!("Deleting account with ID: {}", id);
@@ -228,12 +220,10 @@ struct AccountRow {
     pub updated_at: Option<String>,
 }
 
-/// ヘルパー関数: AccountRowをAccountに変換する。
-///
-/// # 引数
+/// ヘルパー関数: AccountRowをAccountに変換する
+/// # Arguments
 /// * `row` - データベースから取得したAccountRow
-///
-/// # 戻り値
+/// # Returns
 /// * `Account` - 変換後のAccount構造体
 fn convert_row_to_object(row: &AccountRow) -> Account {
     debug!("Converting AccountRow to Account: {}", row.id);
@@ -250,12 +240,10 @@ fn convert_row_to_object(row: &AccountRow) -> Account {
     }
 }
 
-/// ヘルパー関数: AccountをAccountRowに変換する。
-///
-/// # 引数
+/// ヘルパー関数: AccountをAccountRowに変換する
+/// # Arguments
 /// * `account` - 変換対象のAccount構造体
-///
-/// # 戻り値
+/// # Returns
 /// * `AccountRow` - 変換後のAccountRow構造体
 fn convert_object_to_row(account: &Account) -> AccountRow {
     debug!("Converting Account to AccountRow: {:?}", account);
@@ -270,12 +258,10 @@ fn convert_object_to_row(account: &Account) -> AccountRow {
     }
 }
 
-/// ヘルパー関数: Vec<AccountRow>をVec<Account>に変換する。
-///
-/// # 引数
+/// ヘルパー関数: Vec<AccountRow>をVec<Account>に変換する
+/// # Arguments
 /// * `rows` - データベースから取得したAccountRowのベクタ
-///
-/// # 戻り値
+/// # Returns
 /// * `Vec<Account>` - 変換後のAccount構造体のベクタ
 fn convert_iter_to_accounts(rows: Vec<AccountRow>) -> Vec<Account> {
     debug!("Converting Vec<AccountRow> to Vec<Account>: {} rows", rows.len());
@@ -345,9 +331,10 @@ mod tests {
             // preparation
             let pool = fixtures_db::create_test_db().await;
             fixtures_accounts::insert_test_account(&pool).await;
+            let account_type_name = "存在しない口座タイプ".to_string();
             // execution
             let dao = AccountDaoImpl::new_arc();
-            let filtered = dao.get_accounts_list_by_type(&pool, "存在しない口座タイプ").await.unwrap();
+            let filtered = dao.get_accounts_list_by_type(&pool, &account_type_name).await.unwrap();
             // assertion
             assert!(filtered.is_empty());
         }
