@@ -45,13 +45,17 @@ pub fn set_route(cfg: &mut web::ServiceConfig) {
     (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_create_account")})),
 ))]
 /// 新しい口座情報を作成するAPI
+/// # Arguments
+/// * `pool` - Sqliteのコネクションプール
+/// * `app_module` - アプリケーションのDIコンテナ
+/// * `data` - リクエストボディから取得した口座情報
 pub async fn create_account_handler(
-    db_pool: web::Data<SqlitePool>,
+    pool: web::Data<SqlitePool>,
     app_module: web::Data<AppModule>,
     data: web::Json<Account>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
-    handler.create_account(db_pool, data).await
+    handler.create_account(pool, data).await
 }
 
 #[utoipa::path(delete, path = "/api/account/{id}", tag = "accounts", params(
@@ -62,13 +66,19 @@ pub async fn create_account_handler(
     (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_delete_account")})),
 ))]
 /// 指定されたIDの口座情報を削除するAPI
+/// # Arguments
+/// * `pool` - Sqliteのコネクションプール
+/// * `app_module` - アプリケーションのDIコンテナ
+/// * `path` - リクエストパスから取得した口座ID
+/// # Returns
+/// 成功時はHTTP 204、失敗時はHTTP 500とエラーメッセージを返す
 pub async fn delete_account_handler(
-    db_pool: web::Data<SqlitePool>,
+    pool: web::Data<SqlitePool>,
     app_module: web::Data<AppModule>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
-    handler.delete_account(db_pool, path).await
+    handler.delete_account(pool, path).await
 }
 
 #[utoipa::path(get, path = "/api/account/{id}", tag = "accounts", params(
@@ -79,13 +89,19 @@ pub async fn delete_account_handler(
     (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_fetch_account")})),
 ))]
 /// 指定されたIDの口座情報を取得するAPI
+/// # Arguments
+/// * `pool` - Sqliteのコネクションプール
+/// * `app_module` - アプリケーションのDIコンテナ
+/// * `path` - リクエストパスから取得した口座ID
+/// # Returns
+/// 成功時はHTTP 200、失敗時はHTTP 500とエラーメッセージを返す
 pub async fn get_account_by_id_handler(
-    db_pool: web::Data<SqlitePool>,
+    pool: web::Data<SqlitePool>,
     app_module: web::Data<AppModule>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
-    handler.get_account_by_id(db_pool, path).await
+    handler.get_account_by_id(pool, path).await
 }
 
 #[utoipa::path(get, path = "/api/account", tag = "accounts", responses(
@@ -93,12 +109,17 @@ pub async fn get_account_by_id_handler(
     (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_fetch_accounts")}))
 ))]
 /// 全ての口座情報を取得するAPI
+/// # Arguments
+/// * `pool` - Sqliteのコネクションプール
+/// * `app_module` - アプリケーションのDIコンテナ
+/// # Returns
+/// 成功時はHTTP 200、失敗時はHTTP 500とエラーメッセージを返す
 pub async fn get_accounts_list_all_handler(
-    db_pool: web::Data<SqlitePool>,
+    pool: web::Data<SqlitePool>,
     app_module: web::Data<AppModule>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
-    handler.get_accounts_list_all(db_pool).await
+    handler.get_accounts_list_all(pool).await
 }
 
 #[utoipa::path(get, path = "/api/account/type/{type_name}", tag = "accounts", params(
@@ -109,13 +130,19 @@ pub async fn get_accounts_list_all_handler(
     (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_fetch_accounts")})),
 ))]
 /// 指定された口座種別の口座情報を取得するAPI
+/// # Arguments
+/// * `pool` - Sqliteのコネクションプール
+/// * `app_module` - アプリケーションのDIコンテナ
+/// * `path` - リクエストパスから取得した口座種別名
+/// # Returns
+/// 成功時はHTTP 200、失敗時はHTTP 500とエラーメッセージを返す
 pub async fn get_accounts_list_by_type_handler(
-    db_pool: web::Data<SqlitePool>,
+    pool: web::Data<SqlitePool>,
     app_module: web::Data<AppModule>,
     path: web::Path<String>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
-    handler.get_accounts_list_by_type(db_pool, path).await
+    handler.get_accounts_list_by_type(pool, path).await
 }
 
 #[utoipa::path(put, path = "/api/account", tag = "accounts", request_body = Account, responses(
@@ -124,47 +151,55 @@ pub async fn get_accounts_list_by_type_handler(
     (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_update_account")})),
 ))]
 /// 指定されたIDの口座情報を更新するAPI
+/// # Arguments
+/// * `pool` - Sqliteのコネクションプール
+/// * `app_module` - アプリケーションのDIコンテナ
+/// * `data` - リクエストボディから取得した口座情報
+/// # Returns
+/// 成功時はHTTP 200、失敗時はHTTP 500とエラーメッセージを返す
 pub async fn update_account_handler(
-    db_pool: web::Data<SqlitePool>,
+    pool: web::Data<SqlitePool>,
     app_module: web::Data<AppModule>,
     data: web::Json<Account>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
-    handler.update_account(db_pool, data).await
+    handler.update_account(pool, data).await
 }
 
-// ハンドラートレイト定義（グローバルスコープに移動）
+/// 口座情報ハンドラーのインターフェース
 #[async_trait::async_trait]
 pub trait AccountHandler: Interface {
     async fn create_account(
         &self,
-        db_pool: web::Data<SqlitePool>,
+        pool: web::Data<SqlitePool>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error>;
     async fn delete_account(
         &self,
-        db_pool: web::Data<SqlitePool>,
+        pool: web::Data<SqlitePool>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error>;
     async fn get_account_by_id(
         &self,
-        db_pool: web::Data<SqlitePool>,
+        pool: web::Data<SqlitePool>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error>;
-    async fn get_accounts_list_all(&self, db_pool: web::Data<SqlitePool>) -> Result<HttpResponse, actix_web::Error>;
+    async fn get_accounts_list_all(&self, pool: web::Data<SqlitePool>) -> Result<HttpResponse, actix_web::Error>;
     async fn get_accounts_list_by_type(
         &self,
-        db_pool: web::Data<SqlitePool>,
+        pool: web::Data<SqlitePool>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error>;
     async fn update_account(
         &self,
-        db_pool: web::Data<SqlitePool>,
+        pool: web::Data<SqlitePool>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error>;
 }
 
 /// 口座情報ハンドラーの実装
+/// # Fields
+/// * `account_dao` - 口座情報DAOのインスタンス
 #[derive(Clone, Component)]
 #[shaku(interface = AccountHandler)]
 pub struct AccountHandlerImpl {
@@ -175,21 +210,20 @@ pub struct AccountHandlerImpl {
 #[async_trait::async_trait]
 impl AccountHandler for AccountHandlerImpl {
     /// 新しい口座情報を作成するハンドラー関数
-    /// # 引数
+    /// # Arguments
     /// * `pool` - データベース接続プール
-    /// * `dao` - 口座情報DAO
     /// * `data` - リクエストボディから取得した新しい口座情報
-    /// # 戻り値
-    /// 成功時はHTTP 201と作成された口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
+    /// # Returns
+    /// 成功時はHTTP 201と作成件数、失敗時はHTTP 500とエラーメッセージ
     async fn create_account(
         &self,
-        db_pool: web::Data<SqlitePool>,
+        pool: web::Data<SqlitePool>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to create a new account");
         let account_id = data.id.clone();
         // IDの重複チェック
-        let result = self.account_dao.get_account_by_id(&db_pool, &account_id).await;
+        let result = self.account_dao.get_account_by_id(&pool, &account_id).await;
         match result {
             Ok(account) => {
                 if account.is_some() {
@@ -207,7 +241,7 @@ impl AccountHandler for AccountHandlerImpl {
             },
         }
         // 口座の作成
-        let result = self.account_dao.create_account(&db_pool, &data).await;
+        let result = self.account_dao.create_account(&pool, &data).await;
         match result {
             Ok(success_count) => {
                 info!("Created {} new account(s).", success_count);
@@ -221,20 +255,19 @@ impl AccountHandler for AccountHandlerImpl {
     }
 
     /// 指定されたIDの口座情報を削除するハンドラー関数
-    /// # 引数
+    /// # Arguments
     /// * `pool` - データベース接続プール
-    /// * `dao` - 口座情報DAO
     /// * `path` - URLパスから取得した口座ID
-    /// # 戻り値
+    /// # Returns
     /// 成功時はHTTP 200と成功メッセージ、失敗時はHTTP 500とエラーメッセージ
     async fn delete_account(
         &self,
-        db_pool: web::Data<SqlitePool>,
+        pool: web::Data<SqlitePool>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to delete account by ID: {}", account_id);
-        let result = self.account_dao.delete_account(&db_pool, account_id).await;
+        let result = self.account_dao.delete_account(&pool, account_id).await;
         match result {
             Ok(del_count) => {
                 if del_count == 0 {
@@ -252,20 +285,19 @@ impl AccountHandler for AccountHandlerImpl {
     }
 
     /// 指定されたIDの口座情報を取得するハンドラー関数
-    /// # 引数
+    /// # Arguments
     /// * `pool` - データベース接続プール
-    /// * `dao` - 口座情報DAO
     /// * `path` - URLパスから取得した口座ID
-    /// # 戻り値
+    /// # Returns
     /// 成功時はHTTP 200と口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
     async fn get_account_by_id(
         &self,
-        db_pool: web::Data<SqlitePool>,
+        pool: web::Data<SqlitePool>,
         path: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to fetch account by ID: {}", account_id);
-        let result = self.account_dao.get_account_by_id(&db_pool, account_id).await;
+        let result = self.account_dao.get_account_by_id(&pool, account_id).await;
         match result {
             Ok(account) => {
                 if account.is_none() {
@@ -283,14 +315,13 @@ impl AccountHandler for AccountHandlerImpl {
     }
 
     /// 全ての口座情報を取得するハンドラー関数
-    /// # 引数
+    /// # Arguments
     /// * `pool` - データベース接続プール
-    /// * `dao` - 口座情報DAO
-    /// # 戻り値
+    /// # Returns
     /// 成功時はHTTP 200と口座情報のJSON配列、失敗時はHTTP 500とエラーメッセージ
-    async fn get_accounts_list_all(&self, db_pool: web::Data<SqlitePool>) -> Result<HttpResponse, actix_web::Error> {
+    async fn get_accounts_list_all(&self, pool: web::Data<SqlitePool>) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to fetch all accounts");
-        let result = self.account_dao.get_accounts_list_all(&db_pool).await;
+        let result = self.account_dao.get_accounts_list_all(&pool).await;
         match result {
             Ok(accounts) => {
                 info!("Fetched {} accounts.", accounts.len());
@@ -304,20 +335,18 @@ impl AccountHandler for AccountHandlerImpl {
     }
 
     /// 指定された口座種別の口座情報を取得するハンドラー関数
-    /// # 引数
+    /// # Arguments
     /// * `pool` - データベース接続プール
-    /// * `dao` - 口座情報DAO
-    /// * `path` - URLパスから取得した口座種別名
-    /// # 戻り値
+    /// * `type_name` - URLパスから取得した口座種別名
+    /// # Returns
     /// 成功時はHTTP 200と口座情報のJSON配列、失敗時はHTTP 500とエラーメッセージ
     async fn get_accounts_list_by_type(
         &self,
-        db_pool: web::Data<SqlitePool>,
-        path: web::Path<String>,
+        pool: web::Data<SqlitePool>,
+        type_name: web::Path<String>,
     ) -> Result<HttpResponse, actix_web::Error> {
-        let type_name = path.as_str();
         info!("Received request to fetch accounts of type: {}", type_name);
-        let result = self.account_dao.get_accounts_list_by_type(&db_pool, type_name).await;
+        let result = self.account_dao.get_accounts_list_by_type(&pool, &type_name).await;
         match result {
             Ok(accounts) => {
                 if accounts.is_empty() {
@@ -343,11 +372,11 @@ impl AccountHandler for AccountHandlerImpl {
     /// 成功時はHTTP 200と更新された口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
     async fn update_account(
         &self,
-        db_pool: web::Data<SqlitePool>,
+        pool: web::Data<SqlitePool>,
         data: web::Json<Account>,
     ) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to update account by ID: {}", data.id);
-        let result = self.account_dao.update_account(&db_pool, &data).await;
+        let result = self.account_dao.update_account(&pool, &data).await;
         match result {
             Ok(updated_count) => {
                 if updated_count == 0 {
@@ -370,24 +399,25 @@ mod tests {
     use super::*;
     use crate::utils::unit_test::fixtures::accounts as fixtures_accounts;
     use crate::utils::unit_test::fixtures::accounts::{
-        ParametrizedMockAccountDaoImpl, ParametrizedMockAccountDaoImplParameters,
+        MockConfig, ParametrizedMockAccountDaoImpl, ParametrizedMockAccountDaoImplParameters,
     };
     use crate::utils::unit_test::fixtures::app_test_setup::TestAppModule;
     use crate::utils::unit_test::fixtures::db as fixtures_db;
     use actix_web::body::to_bytes;
     use actix_web::http::StatusCode;
 
-    async fn setup(
-        parameters: ParametrizedMockAccountDaoImplParameters,
-    ) -> (web::Data<SqlitePool>, Arc<dyn AccountHandler>) {
+    async fn setup(parameters: MockConfig) -> (web::Data<SqlitePool>, Arc<dyn AccountHandler>) {
         let pool = web::Data::new(fixtures_db::create_undefined_db().await);
-        let add_module =
-            TestAppModule::builder().with_component_parameters::<ParametrizedMockAccountDaoImpl>(parameters).build();
+        let add_module = TestAppModule::builder()
+            .with_component_parameters::<ParametrizedMockAccountDaoImpl>(ParametrizedMockAccountDaoImplParameters {
+                config: Arc::new(parameters),
+            })
+            .build();
         (pool, add_module.resolve())
     }
 
-    pub fn get_normal_params() -> ParametrizedMockAccountDaoImplParameters {
-        ParametrizedMockAccountDaoImplParameters {
+    pub fn get_normal_params() -> MockConfig {
+        MockConfig {
             error_on_create: false,
             error_on_get: false,
             error_on_update: false,
@@ -400,8 +430,8 @@ mod tests {
         }
     }
 
-    pub fn get_exists_account_params() -> ParametrizedMockAccountDaoImplParameters {
-        ParametrizedMockAccountDaoImplParameters {
+    pub fn get_exists_account_params() -> MockConfig {
+        MockConfig {
             error_on_create: false,
             error_on_get: false,
             error_on_update: false,
@@ -414,8 +444,8 @@ mod tests {
         }
     }
 
-    pub fn get_empty_params() -> ParametrizedMockAccountDaoImplParameters {
-        ParametrizedMockAccountDaoImplParameters {
+    pub fn get_empty_params() -> MockConfig {
+        MockConfig {
             error_on_create: false,
             error_on_get: false,
             error_on_update: false,
@@ -428,8 +458,8 @@ mod tests {
         }
     }
 
-    pub fn get_error_params() -> ParametrizedMockAccountDaoImplParameters {
-        ParametrizedMockAccountDaoImplParameters {
+    pub fn get_error_params() -> MockConfig {
+        MockConfig {
             error_on_create: true,
             error_on_get: true,
             error_on_update: true,
@@ -442,8 +472,8 @@ mod tests {
         }
     }
 
-    pub fn get_error_on_creation_params() -> ParametrizedMockAccountDaoImplParameters {
-        ParametrizedMockAccountDaoImplParameters {
+    pub fn get_error_on_creation_params() -> MockConfig {
+        MockConfig {
             error_on_create: true,
             error_on_get: false,
             error_on_update: true,
