@@ -1,15 +1,14 @@
-use ebisu_api::dao::accounts::AccountDao;
-use ebisu_api::entity::accounts::{Account, AccountType};
+#![cfg(test)]
+use crate::dao::accounts::AccountDao;
+use crate::entity::accounts::{Account, AccountType};
+use backtrace::Backtrace;
 use serde::Deserialize;
 use shaku::Component;
 use sqlx::SqlitePool;
 use std::fs;
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
-};
+use std::sync::Arc;
 
-const TEST_ACCOUNT_DATA_PATH: &str = "./testdata/accounts.yaml";
+const TEST_ACCOUNT_DATA_PATH: &str = "./tests/data/accounts.yaml";
 
 #[derive(Debug, Deserialize)]
 struct YamlAccount {
@@ -114,17 +113,20 @@ pub fn create_new_account() -> Account {
     }
 }
 
-/// テスト用のAccountDaoモックのパラメータ化実装構造体
-/// # Fields
-/// * `error_on_create` - createでエラーを発生させるか
-/// * `error_on_get` - getでエラーを発生させるか
-/// * `error_on_update` - updateでエラーを発生させるか
-/// * `error_on_delete` - deleteでエラーを発生させるか
-/// * `get_return_empty` - getで空の結果を返すか
-/// * `get_in_create_return_empty` - create_accountからのget_account_by_idで空の結果を返すか
-/// * `create_return_empty` - createで空の結果を返すか
-/// * `update_return_empty` - updateで空の結果を返すか
-/// * `delete_return_empty` - deleteで空の結果を返すか
+// モックで呼び出し元がcreate_account関数かどうかを判定するヘルパー関数
+fn is_called_from_create_account(bt: &Backtrace) -> bool {
+    for frame in bt.frames() {
+        for symbol in frame.symbols() {
+            if let Some(name) = symbol.name() {
+                if name.to_string().contains("create_account") {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 #[derive(Clone, Debug)]
 pub struct MockConfig {
     pub error_on_create: bool,
@@ -140,23 +142,24 @@ pub struct MockConfig {
 
 /// テスト用のAccountDaoモックのパラメータ化実装構造体
 /// # Fields
-/// * `config` - モックの動作を制御する設定
-/// * `call_count` - get_account_by_idの呼び出し回数を追跡するためのカウンタ
+/// * `error_on_create` - createでエラーを発生させるか
+/// * `error_on_get` - getでエラーを発生させるか
+/// * `error_on_update` - updateでエラーを発生させるか
+/// * `error_on_delete` - deleteでエラーを発生させるか
+/// * `get_return_empty` - getで空の結果を返すか
+/// * `get_in_create_return_empty` - create_accountからのget_account_by_idで空の結果を返すか
+/// * `create_return_empty` - createで空の結果を返すか
+/// * `update_return_empty` - updateで空の結果を返すか
+/// * `delete_return_empty` - deleteで空の結果を返すか
 #[derive(Clone, Component)]
 #[shaku(interface = AccountDao)]
 pub struct ParametrizedMockAccountDaoImpl {
     pub config: Arc<MockConfig>,
-    pub call_count: Arc<AtomicUsize>,
 }
 
 /// テスト用のAccountDaoトレイトのモックの実装
 #[async_trait::async_trait]
 impl AccountDao for ParametrizedMockAccountDaoImpl {
-    /// 全ての口座リストを取得するモック実装
-    /// # Arguments
-    /// * `_pool` - Sqliteのコネクションプール（未使用）
-    /// # Returns
-    /// * `sqlx::Result<Vec<Account>>` - 口座情報のベクトルまたはエラー
     async fn get_accounts_list_all(&self, _pool: &SqlitePool) -> sqlx::Result<Vec<Account>> {
         if self.config.error_on_get {
             return Err(sqlx::Error::RowNotFound);
@@ -167,12 +170,6 @@ impl AccountDao for ParametrizedMockAccountDaoImpl {
         Ok(get_sorted_account_list())
     }
 
-    /// 指定された口座種別の口座リストを取得するモック実装
-    /// # Arguments
-    /// * `_pool` - Sqliteのコネクションプール（未使用）
-    /// * `account_type_name` - 口座種別名
-    /// # Returns
-    /// * `sqlx::Result<Vec<Account>>` - 口座情報のベクトルまたはエラー
     async fn get_accounts_list_by_type(
         &self,
         _pool: &SqlitePool,
@@ -189,40 +186,19 @@ impl AccountDao for ParametrizedMockAccountDaoImpl {
         Ok(accounts)
     }
 
-    /// 指定されたIDの口座情報を取得するモック実装
-    /// # Arguments
-    /// * `_pool` - Sqliteのコネクションプール（未使用）
-    /// * `id` - 口座ID
-    /// # Returns
-    /// * `sqlx::Result<Option<Account>>` - 口座情報またはエラー
     async fn get_account_by_id(&self, _pool: &SqlitePool, id: &str) -> sqlx::Result<Option<Account>> {
         if self.config.error_on_get {
             return Err(sqlx::Error::RowNotFound);
         }
-        let account = get_account_list().into_iter().find(|acc| acc.id == id);
-        // 呼び出し回数で返却値を制御: 1回目はNone, 2回目以降はSome(account)
-        if self.config.get_in_create_return_empty {
-            let count = self.call_count.fetch_add(1, Ordering::SeqCst);
-            if count == 0 {
-                // 1回目の呼び出し
-                return Ok(None);
-            } else {
-                // 2回目以降の呼び出し
-                return Ok(account);
-            }
-        }
-        if self.config.get_return_empty {
+        if self.config.get_return_empty
+            || (self.config.get_in_create_return_empty && is_called_from_create_account(&Backtrace::new()))
+        {
             return Ok(None);
         }
+        let account = get_account_list().into_iter().find(|acc| acc.id == id);
         Ok(account)
     }
 
-    /// 口座情報を作成するモック実装
-    /// # Arguments
-    /// * `_pool` - Sqliteのコネクションプール（未使用）
-    /// * `account` - 作成する口座情報
-    /// # Returns
-    /// * `sqlx::Result<u64>` - 作成された行数またはエラー
     async fn create_account(&self, _pool: &SqlitePool, _account: &Account) -> sqlx::Result<u64> {
         if self.config.error_on_create {
             return Err(sqlx::Error::RowNotFound);
@@ -233,12 +209,6 @@ impl AccountDao for ParametrizedMockAccountDaoImpl {
         Ok(1)
     }
 
-    /// 口座情報を更新するモック実装
-    /// # Arguments
-    /// * `_pool` - Sqliteのコネクションプール（未使用）
-    /// * `account` - 更新する口座情報
-    /// # Returns
-    /// * `sqlx::Result<u64>` - 更新された行数またはエラー
     async fn update_account(&self, _pool: &SqlitePool, _account: &Account) -> sqlx::Result<u64> {
         if self.config.error_on_update {
             return Err(sqlx::Error::RowNotFound);
@@ -249,12 +219,6 @@ impl AccountDao for ParametrizedMockAccountDaoImpl {
         Ok(1)
     }
 
-    /// 口座情報を削除するモック実装
-    /// # Arguments
-    /// * `_pool` - Sqliteのコネクションプール（未使用）
-    /// * `id` - 口座ID
-    /// # Returns
-    /// * `sqlx::Result<u64>` - 削除された行数またはエラー
     async fn delete_account(&self, _pool: &SqlitePool, _id: &str) -> sqlx::Result<u64> {
         if self.config.error_on_delete {
             return Err(sqlx::Error::RowNotFound);
