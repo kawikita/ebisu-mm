@@ -99,7 +99,6 @@ ebisu_api/
 
 * **メッセージ:** Conventional Commitsの規約に従ってください。（例: `feat: ...`, `fix: ...`, `refactor: ...`）
     * メッセージの先頭には、関連するIssue番号を`#<issue_number>`の形式で必ず含めてください。（例: `feat(#15): add user authentication middleware`）
-    * 先頭行から１行空けて変更点を箇条書きで簡潔に書いてください。
 * **コミット前チェック:** コミットを実行する前に、以下のコマンドを実行し、すべてのチェックが成功することを確認してください。
     1. `cargo fmt`
     2. `cargo test`
