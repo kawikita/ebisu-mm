@@ -38,6 +38,7 @@ utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 
 [dev-dependencies]
+ebisu_api_test_utils = { path = "../ebisu_api_test_utils" }
 backtrace = "0.3.76"
 sqlx-cli = { version = "0.8" }
 
