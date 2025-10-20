@@ -1,6 +1,5 @@
-#![cfg(test)]
-use crate::handler::accounts::AccountHandlerImpl;
-use crate::utils::unit_test::fixtures::accounts::ParametrizedMockAccountDaoImpl;
+use crate::fixtures::accounts::ParametrizedMockAccountDaoImpl;
+use ebisu_api::handler::accounts::AccountHandlerImpl;
 use shaku::module;
 
 // テスト用のモジュールとモックを定義
