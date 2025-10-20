@@ -2,5 +2,23 @@
 name = "ebisu_api_test_utils"
 version = "0.1.0"
 edition = "2024"
+description = "Test Utilities for Ebisu API Server"
+authors = ["Tomonobu Kawakita <tomonobu.kawakita@samuraiqalabo.tech>"]
+
+[lib]
+name = "ebisu_api_test_utils"
+path = "src/lib.rs"
 
 [dependencies]
+ebisu_api = { path = "../ebisu_api" }
+async-trait = "0.1.89"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+serde_yaml = "0.9.34"
+shaku = { version = "0.6.2", features = ["derive"] }
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"] }
+tokio = "1.48.0"
+uuid = "1.18.1"
+
+[dev-dependencies]
+sqlx-cli = "0.8.6"
