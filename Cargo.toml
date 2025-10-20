@@ -1,2 +1,2 @@
 [workspace]
-members = ["ebisu_api"]
+members = ["ebisu_api", "ebisu_api_test_utils"]
