@@ -36,6 +36,7 @@ test-utils = ["backtrace"]
 
 [dev-dependencies]
 ebisu_api = { path = ".", features = ["test-utils"] }
+backtrace = { version = "0.3.76" }
 sqlx-cli = { version = "0.8" }
 
 [build-dependencies]
