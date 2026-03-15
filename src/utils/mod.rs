@@ -5,5 +5,5 @@ pub mod message; // メッセージ関連
 pub mod options; // オプション関連
 pub mod version; // バージョン関連
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 pub mod unit_test; // ユニットテスト関連
