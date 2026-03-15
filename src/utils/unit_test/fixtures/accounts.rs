@@ -1,4 +1,3 @@
-#![cfg(test)]
 use crate::dao::accounts::AccountDao;
 use crate::entity::accounts::{Account, AccountType};
 use backtrace::Backtrace;
