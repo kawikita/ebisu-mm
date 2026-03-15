@@ -57,6 +57,28 @@ package ebisu_api {
   }
 
   package utils {
+    package unit_test {
+      package fixtures {
+        class accounts {
+          +insert_test_account()
+          +get_account_list()
+          +get_sorted_account_list()
+          +get_first_account()
+          +create_new_account()
+        }
+        class db {
+          +create_empty_db()
+          +create_test_db()
+          +db_migration()
+        }
+      }
+    }
+    note bottom: 単体テストでしか使わない
+    package test_helpers {
+      class accounts
+      class db
+    }
+    note bottom: test_helpersはunit_test::fixturesのエイリアス
     package app_setup as AppSetupModule {
       ' AppModule (DI用)
       struct AppModule {
