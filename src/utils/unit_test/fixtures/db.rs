@@ -32,15 +32,24 @@ pub async fn db_migration() -> SqlitePool {
     let pool = create_undefined_db().await;
     let mut conn = pool.acquire().await.unwrap();
     // マイグレーションファイルを読み込み、順番に実行する
-    let paths = fs::read_dir(MIGRATIONS_DIR).expect("Failed to read migrations directory");
-    for entry in paths {
-        let path = entry.expect("Failed to get entry").path();
-        if path.extension().map_or(false, |ext| ext == "sql") {
-            let sql_content = fs::read_to_string(&path).expect(&format!("Failed to read SQL file: {}", path.display()));
-            conn.execute(sql_content.as_str())
-                .await
-                .expect(&format!("Failed to execute migration: {}", path.display()));
-        }
+    for sql_path in collect_sqlfiles() {
+        let sql_content =
+            fs::read_to_string(&sql_path).expect(&format!("Failed to read SQL file: {}", sql_path.display()));
+        conn.execute(sql_content.as_str())
+            .await
+            .expect(&format!("Failed to execute migration: {}", sql_path.display()));
     }
     pool
+}
+
+fn collect_sqlfiles() -> Vec<std::path::PathBuf> {
+    let mut sql_paths: Vec<std::path::PathBuf> = fs::read_dir(MIGRATIONS_DIR)
+        .expect("Failed to read migrations directory")
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            if path.extension().map_or(false, |ext| ext == "sql") { Some(path) } else { None }
+        })
+        .collect();
+    sql_paths.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    sql_paths
 }
