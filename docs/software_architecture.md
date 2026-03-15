@@ -81,6 +81,8 @@ Ebisu APIはRust/Actix Webをベースとした個人向け家計簿アプリの
 ## 6. テスト設計
 - unit_test/fixtures: モック・テストDB・パラメータ化DI
 - handler/daoの単体・結合テスト（インメモリDB、パラメータ化モック）
+  - テストデータや共通のヘルパー関数はfixtureにまとめる
+  - 単体テスト、結合テストの共通のテストデータやヘルパー関数はfeatureフラグを用いて相互に利用する
 - cargo testによる自動化
 
 ---
