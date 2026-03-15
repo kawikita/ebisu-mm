@@ -283,7 +283,7 @@ mod tests {
         #[tokio::test]
         async fn account_in_empty() {
             // preparation
-            let pool = fixtures_db::create_test_db().await;
+            let pool = fixtures_db::create_empty_db().await;
             // execution
             let dao = AccountDaoImpl::new_arc();
             let accounts = dao.get_accounts_list_all(&pool).await.unwrap();
@@ -294,7 +294,7 @@ mod tests {
         #[tokio::test]
         async fn account_in_one() {
             // preparation
-            let pool = fixtures_db::create_test_db().await;
+            let pool = fixtures_db::create_empty_db().await;
             let first_account = fixtures_accounts::get_first_account();
             fixtures_accounts::insert_account(&pool, &first_account).await;
             // execution
@@ -309,7 +309,6 @@ mod tests {
         async fn account_in_three() {
             // preparation
             let pool = fixtures_db::create_test_db().await;
-            fixtures_accounts::insert_test_account(&pool).await;
             let account_list = fixtures_accounts::get_sorted_account_list();
             // execution
             let dao = AccountDaoImpl::new_arc();
@@ -330,7 +329,6 @@ mod tests {
         async fn not_found_account_type() {
             // preparation
             let pool = fixtures_db::create_test_db().await;
-            fixtures_accounts::insert_test_account(&pool).await;
             let account_type_name = "存在しない口座タイプ".to_string();
             // execution
             let dao = AccountDaoImpl::new_arc();
@@ -343,7 +341,6 @@ mod tests {
         async fn found_one_saving_account() {
             // preparation
             let pool = fixtures_db::create_test_db().await;
-            fixtures_accounts::insert_test_account(&pool).await;
             let account_type_name = "銀行口座(普通)".to_string();
             // execution
             let dao = AccountDaoImpl::new_arc();
@@ -357,7 +354,6 @@ mod tests {
         async fn found_two_saving_accounts() {
             // preparation
             let pool = fixtures_db::create_test_db().await;
-            fixtures_accounts::insert_test_account(&pool).await;
             let adding_account = fixtures_accounts::create_new_account();
             fixtures_accounts::insert_account(&pool, &adding_account).await;
             let account_type_name = "銀行口座(普通)".to_string();
@@ -380,7 +376,6 @@ mod tests {
         async fn not_found_account() {
             // preparation
             let pool = fixtures_db::create_test_db().await;
-            fixtures_accounts::insert_test_account(&pool).await;
             let search_id = Uuid::new_v4().to_string();
             // execution
             let dao = AccountDaoImpl::new_arc();
@@ -393,7 +388,6 @@ mod tests {
         async fn found_account_by_id() {
             // preparation
             let pool = fixtures_db::create_test_db().await;
-            fixtures_accounts::insert_test_account(&pool).await;
             let first_account = fixtures_accounts::get_first_account();
             // execution
             let dao = AccountDaoImpl::new_arc();
@@ -440,7 +434,6 @@ mod tests {
         async fn updates_account() {
             // preparation
             let pool = fixtures_db::create_test_db().await;
-            fixtures_accounts::insert_test_account(&pool).await;
             let before_account = fixtures_accounts::get_first_account();
             let dao = AccountDaoImpl::new_arc();
             let before = dao.get_account_by_id(&pool, &before_account.id).await.unwrap().unwrap();
@@ -472,7 +465,6 @@ mod tests {
         async fn deletes_account() {
             // preparation
             let pool = fixtures_db::create_test_db().await;
-            fixtures_accounts::insert_test_account(&pool).await;
             let delete_account = fixtures_accounts::get_first_account();
             // execution
             let dao = AccountDaoImpl::new_arc();

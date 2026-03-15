@@ -286,7 +286,7 @@ mod put_account {
         let mut update_account = before.clone();
         update_account.memo = Some("更新されたメモ".to_string());
         update_account.updated_at = None;
-        sleep(Duration::from_secs(1)).await; // updated_atの差分を確実にするため、少し待機
+        sleep(Duration::from_secs(2)).await; // updated_atの差分を確実にするため、少し待機
         // execution
         let api_path = API_BASE_PATH;
         let resp = call_api(&pool, HttpMethod::PUT, &api_path, Some(&update_account)).await;
