@@ -13,7 +13,6 @@ target/
 *.log
 
 # By-products
-Cargo.lock
 *.dSYM/
 *.exe
 *.dll

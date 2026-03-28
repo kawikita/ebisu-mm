@@ -57,7 +57,9 @@ Ebisu APIはRust/Actix Webをベースとした個人向け家計簿アプリの
 - app_setup.rs: DIコンテナ（AppModule）、DBプール生成、サーバ構築
 - logging.rs: ロガー初期化
 - exporter.rs: OpenAPI仕様エクスポート
-- options.rs, version.rs: CLI/バージョン管理
+- options.rs: CLIオプション定義
+- version.rs: バージョン情報
+- unit_test/: 単体テスト用のfixtureやモジュール
 
 ### 4.3. handler/
 
@@ -90,7 +92,7 @@ Ebisu APIはRust/Actix Webをベースとした個人向け家計簿アプリの
 
 - unit_test/fixtures: モック・テストDB・パラメータ化DI
 - handler/daoの単体・結合テスト（インメモリDB、パラメータ化モック）
-- testuresモジュール: モック・テストDB・パラメータ化DIをまとめて管理
+- test_helpersモジュール: モック・テストDB・パラメータ化DIをまとめて管理
   - 単体テスト、結合テストの共通のテストデータやヘルパー関数は`test-utils` featureフラグを用いて相互に利用する
   - `#[cfg(any(test, feature = "test-utils"))]`でテストコードを条件付きコンパイルし、`Cargo.toml`の`test-utils`featureで`test_helpers`モジュールを公開
 - cargo testによる自動化
@@ -128,4 +130,4 @@ main.rs
 - API仕様は`docs/specification/accounts.md`等参照
 
 ---
-最終更新: 2025-10-19
+最終更新: 2026-03-29

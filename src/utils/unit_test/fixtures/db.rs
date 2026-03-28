@@ -23,7 +23,7 @@ pub async fn create_test_db() -> SqlitePool {
 pub async fn create_undefined_db() -> SqlitePool {
     let db_name = format!("file:memdb-{}", Uuid::new_v4().to_string());
     let db_url = format!("{}?mode=memory&cache=shared", db_name);
-    let pool = SqlitePoolOptions::new().connect(&db_url).await.unwrap();
+    let pool = SqlitePoolOptions::new().max_connections(1).connect(&db_url).await.unwrap();
     pool
 }
 
@@ -33,11 +33,8 @@ pub async fn db_migration() -> SqlitePool {
     let mut conn = pool.acquire().await.unwrap();
     // マイグレーションファイルを読み込み、順番に実行する
     for sql_path in collect_sqlfiles() {
-        let sql_content =
-            fs::read_to_string(&sql_path).expect(&format!("Failed to read SQL file: {}", sql_path.display()));
-        conn.execute(sql_content.as_str())
-            .await
-            .expect(&format!("Failed to execute migration: {}", sql_path.display()));
+        let sql_content = fs::read_to_string(&sql_path).expect(&format!("Failed to read SQL file: {}", sql_path.display()));
+        conn.execute(sql_content.as_str()).await.expect(&format!("Failed to execute migration: {}", sql_path.display()));
     }
     pool
 }

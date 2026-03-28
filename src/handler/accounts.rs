@@ -28,11 +28,7 @@ pub fn set_route(cfg: &mut web::ServiceConfig) {
                     .route(web::post().to(create_account_handler))
                     .route(web::put().to(update_account_handler)),
             )
-            .service(
-                web::resource("/{id}")
-                    .route(web::get().to(get_account_by_id_handler))
-                    .route(web::delete().to(delete_account_handler)),
-            )
+            .service(web::resource("/{id}").route(web::get().to(get_account_by_id_handler)).route(web::delete().to(delete_account_handler)))
             .service(web::resource("/type/{type_name}").route(web::get().to(get_accounts_list_by_type_handler))),
     );
 }
@@ -114,10 +110,7 @@ pub async fn get_account_by_id_handler(
 /// * `app_module` - アプリケーションのDIコンテナ
 /// # Returns
 /// 成功時はHTTP 200、失敗時はHTTP 500とエラーメッセージを返す
-pub async fn get_accounts_list_all_handler(
-    pool: web::Data<SqlitePool>,
-    app_module: web::Data<AppModule>,
-) -> Result<HttpResponse, actix_web::Error> {
+pub async fn get_accounts_list_all_handler(pool: web::Data<SqlitePool>, app_module: web::Data<AppModule>) -> Result<HttpResponse, actix_web::Error> {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
     handler.get_accounts_list_all(pool).await
 }
@@ -169,32 +162,12 @@ pub async fn update_account_handler(
 /// 口座情報ハンドラーのインターフェース
 #[async_trait::async_trait]
 pub trait AccountHandler: Interface {
-    async fn create_account(
-        &self,
-        pool: web::Data<SqlitePool>,
-        data: web::Json<Account>,
-    ) -> Result<HttpResponse, actix_web::Error>;
-    async fn delete_account(
-        &self,
-        pool: web::Data<SqlitePool>,
-        path: web::Path<String>,
-    ) -> Result<HttpResponse, actix_web::Error>;
-    async fn get_account_by_id(
-        &self,
-        pool: web::Data<SqlitePool>,
-        path: web::Path<String>,
-    ) -> Result<HttpResponse, actix_web::Error>;
+    async fn create_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> Result<HttpResponse, actix_web::Error>;
+    async fn delete_account(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> Result<HttpResponse, actix_web::Error>;
+    async fn get_account_by_id(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> Result<HttpResponse, actix_web::Error>;
     async fn get_accounts_list_all(&self, pool: web::Data<SqlitePool>) -> Result<HttpResponse, actix_web::Error>;
-    async fn get_accounts_list_by_type(
-        &self,
-        pool: web::Data<SqlitePool>,
-        path: web::Path<String>,
-    ) -> Result<HttpResponse, actix_web::Error>;
-    async fn update_account(
-        &self,
-        pool: web::Data<SqlitePool>,
-        data: web::Json<Account>,
-    ) -> Result<HttpResponse, actix_web::Error>;
+    async fn get_accounts_list_by_type(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> Result<HttpResponse, actix_web::Error>;
+    async fn update_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> Result<HttpResponse, actix_web::Error>;
 }
 
 /// 口座情報ハンドラーの実装
@@ -215,11 +188,7 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `data` - リクエストボディから取得した新しい口座情報
     /// # Returns
     /// 成功時はHTTP 201と作成件数、失敗時はHTTP 500とエラーメッセージ
-    async fn create_account(
-        &self,
-        pool: web::Data<SqlitePool>,
-        data: web::Json<Account>,
-    ) -> Result<HttpResponse, actix_web::Error> {
+    async fn create_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to create a new account");
         let account_id = data.id.clone();
         // IDの重複チェック
@@ -228,16 +197,12 @@ impl AccountHandler for AccountHandlerImpl {
             Ok(account) => {
                 if account.is_some() {
                     info!("Account with ID {} already exists.", account_id);
-                    return Ok(
-                        HttpResponse::Conflict().json(json!({"error": MESSAGE.get("account_id_already_exists")}))
-                    );
+                    return Ok(HttpResponse::Conflict().json(json!({"error": MESSAGE.get("account_id_already_exists")})));
                 }
             },
             Err(e) => {
                 error!("Database error: {:?}", e);
-                return Ok(
-                    HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_fetch_account")}))
-                );
+                return Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_fetch_account")})));
             },
         }
         // 口座の作成
@@ -260,11 +225,7 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `path` - URLパスから取得した口座ID
     /// # Returns
     /// 成功時はHTTP 200と成功メッセージ、失敗時はHTTP 500とエラーメッセージ
-    async fn delete_account(
-        &self,
-        pool: web::Data<SqlitePool>,
-        path: web::Path<String>,
-    ) -> Result<HttpResponse, actix_web::Error> {
+    async fn delete_account(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to delete account by ID: {}", account_id);
         let result = self.account_dao.delete_account(&pool, account_id).await;
@@ -290,11 +251,7 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `path` - URLパスから取得した口座ID
     /// # Returns
     /// 成功時はHTTP 200と口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
-    async fn get_account_by_id(
-        &self,
-        pool: web::Data<SqlitePool>,
-        path: web::Path<String>,
-    ) -> Result<HttpResponse, actix_web::Error> {
+    async fn get_account_by_id(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
         let account_id = path.as_str();
         info!("Received request to fetch account by ID: {}", account_id);
         let result = self.account_dao.get_account_by_id(&pool, account_id).await;
@@ -340,11 +297,7 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `type_name` - URLパスから取得した口座種別名
     /// # Returns
     /// 成功時はHTTP 200と口座情報のJSON配列、失敗時はHTTP 500とエラーメッセージ
-    async fn get_accounts_list_by_type(
-        &self,
-        pool: web::Data<SqlitePool>,
-        type_name: web::Path<String>,
-    ) -> Result<HttpResponse, actix_web::Error> {
+    async fn get_accounts_list_by_type(&self, pool: web::Data<SqlitePool>, type_name: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to fetch accounts of type: {}", type_name);
         let result = self.account_dao.get_accounts_list_by_type(&pool, &type_name).await;
         match result {
@@ -370,11 +323,7 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `data` - リクエストボディから取得した更新後の口座情報
     /// # 戻り値
     /// 成功時はHTTP 200と更新された口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
-    async fn update_account(
-        &self,
-        pool: web::Data<SqlitePool>,
-        data: web::Json<Account>,
-    ) -> Result<HttpResponse, actix_web::Error> {
+    async fn update_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> Result<HttpResponse, actix_web::Error> {
         info!("Received request to update account by ID: {}", data.id);
         let result = self.account_dao.update_account(&pool, &data).await;
         match result {
@@ -398,9 +347,7 @@ impl AccountHandler for AccountHandlerImpl {
 mod tests {
     use super::*;
     use crate::utils::unit_test::fixtures::accounts as fixtures_accounts;
-    use crate::utils::unit_test::fixtures::accounts::{
-        MockConfig, ParametrizedMockAccountDaoImpl, ParametrizedMockAccountDaoImplParameters,
-    };
+    use crate::utils::unit_test::fixtures::accounts::{MockConfig, ParametrizedMockAccountDaoImpl, ParametrizedMockAccountDaoImplParameters};
     use crate::utils::unit_test::fixtures::app_test_setup::TestAppModule;
     use crate::utils::unit_test::fixtures::db as fixtures_db;
     use actix_web::body::to_bytes;
@@ -409,9 +356,7 @@ mod tests {
     async fn setup(parameters: MockConfig) -> (web::Data<SqlitePool>, Arc<dyn AccountHandler>) {
         let pool = web::Data::new(fixtures_db::create_undefined_db().await);
         let add_module = TestAppModule::builder()
-            .with_component_parameters::<ParametrizedMockAccountDaoImpl>(ParametrizedMockAccountDaoImplParameters {
-                config: Arc::new(parameters),
-            })
+            .with_component_parameters::<ParametrizedMockAccountDaoImpl>(ParametrizedMockAccountDaoImplParameters { config: Arc::new(parameters) })
             .build();
         (pool, add_module.resolve())
     }

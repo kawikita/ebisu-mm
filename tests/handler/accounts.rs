@@ -19,20 +19,9 @@ enum HttpMethod {
 }
 
 // APIを呼び出すヘルパー関数
-async fn call_api(
-    pool: &Pool<Sqlite>,
-    method: HttpMethod,
-    api_path: &str,
-    send_body: Option<&Account>,
-) -> ServiceResponse {
+async fn call_api(pool: &Pool<Sqlite>, method: HttpMethod, api_path: &str, send_body: Option<&Account>) -> ServiceResponse {
     let app_module = AppModule::builder().build();
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(pool.clone()))
-            .app_data(web::Data::new(app_module))
-            .configure(accounts_configure),
-    )
-    .await;
+    let app = test::init_service(App::new().app_data(web::Data::new(pool.clone())).app_data(web::Data::new(app_module)).configure(accounts_configure)).await;
     let req = {
         match method {
             HttpMethod::GET => test::TestRequest::get().uri(api_path).to_request(),
