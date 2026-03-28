@@ -107,7 +107,7 @@ package ebisu_api {
         Version
       }
     }
-    class versions {
+    class version {
       +show_version()
       +show_version_with_verbose()
     }
@@ -135,3 +135,6 @@ package ebisu_api {
 
 @enduml
 ```
+
+---
+最終更新: 2026-03-29

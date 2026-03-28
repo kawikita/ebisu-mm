@@ -2,7 +2,7 @@
 
 ## 概要
 
-- 個人向けの家計簿ツールのバックエンドです。
+- 個人向けの家計簿ツールです。
 - 将来豊かになることを目指して頑張ろうということで、恵比寿様から名前を頂戴しました。
 - 銀行口座の入出金、クレジットカードの利用残高を管理することができます。
 - 有料ツールのような自動で銀行口座やクレジットカードの履歴を読み込む機能はサポートはされていません。
@@ -18,13 +18,14 @@
 
 本プロジェクトで採用している主要な技術は以下の通りです。
 
-* **言語:** Rust (Edition: 2024)
-* **Webフレームワーク:** Actix Web
-* **非同期ランタイム:** Tokio
-* **データベース:** SQLite (via SQLx)
-* **DIコンテナ:** Shaku
-* **APIドキュメンテーション:** Utoipa
-* **コマンドラインパーサー:** Clap
+- バックエンド
+  - **言語:** Rust (Edition: 2024)
+  - **Webフレームワーク:** Actix Web
+  - **非同期ランタイム:** Tokio
+  - **データベース:** SQLite (via SQLx)
+  - **DIコンテナ:** Shaku
+  - **APIドキュメンテーション:** Utoipa
+  - **コマンドラインパーサー:** Clap
 
 ## 開発プロセス
 
@@ -32,14 +33,16 @@
 
 ### Issueとブランチ
 
-1.  **Issueの作成:** 実装したい機能や改善案は、まず[GitHub Issues](https://github.com/kawikita/ebisu_api/issues)に`UserStory:`、不具合の場合は`Bug:`というプレフィックスをつけて起票してください。
-2.  **ブランチの作成:** `develop`ブランチから、`feature/UpperCamelCase#issue_number`の形式で作業ブランチを作成します。
-3.  **Pull Request:** 作業が完了したら、`develop`ブランチに対してPull Requestを作成してください。
+1. **Issueの作成:** 実装したい機能や改善案は、まず[GitHub Issues](https://github.com/kawikita/ebisu_api/issues)に`UserStory:`、不具合の場合は`Bug:`というプレフィックスをつけて起票してください。
+2. **ブランチの作成:** `develop`ブランチから、`feature/UpperCamelCase#issue_number`の形式で作業ブランチを作成します。
+3. **Pull Request:** 作業が完了したら、`develop`ブランチに対してPull Requestを作成してください。
 
 ### コミット規約
 
-* **メッセージ:** [Conventional Commits](https://www.conventionalcommits.org/)の規約に従ってください。コミットメッセージには関連するIssue番号（例: `#11`）を含めてください。
-* **コミット前チェック:** コミットを実行する前に、ローカルでテストとフォーマットが完了していることを確認してください。
-  ```bash
+- **メッセージ:** [Conventional Commits](https://www.conventionalcommits.org/)の規約に従ってください。コミットメッセージには関連するIssue番号（例: `#11`）を含めてください。
+- **コミット前チェック:** コミットを実行する前に、ローカルでテストとフォーマットが完了していることを確認してください。
+
+  ```shell
   cargo fmt
   cargo test
+  ```

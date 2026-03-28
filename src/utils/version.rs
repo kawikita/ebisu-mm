@@ -5,11 +5,7 @@ include!(concat!(env!("CARGO_MANIFEST_DIR"), "/build_number.rs"));
 /// * `verbose` - 詳細情報を表示するかどうか
 pub fn show_version(verbose: bool) {
     // Cargo.tomlのバージョン情報を埋め込む
-    println!(
-        "{name} v{version}",
-        name = env!("CARGO_PKG_NAME"),
-        version = format!("{}.{}", env!("CARGO_PKG_VERSION"), BUILD_NUMBER),
-    );
+    println!("{name} v{version}", name = env!("CARGO_PKG_NAME"), version = format!("{}.{}", env!("CARGO_PKG_VERSION"), BUILD_NUMBER),);
     if verbose {
         show_version_with_verbose();
     }

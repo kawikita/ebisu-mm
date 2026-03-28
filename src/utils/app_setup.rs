@@ -42,12 +42,10 @@ pub async fn get_server() -> actix_web::dev::Server {
     info!("Configuring and starting Actix Web server.");
     let db_pool = web::Data::new(get_db_pool().await);
     let app_module = web::Data::new(AppModule::builder().build());
-    let server = HttpServer::new(move || {
-        App::new().app_data(db_pool.clone()).app_data(app_module.clone()).configure(set_route_config)
-    })
-    .bind(get_server_and_port())
-    .expect("Failed to bind server address")
-    .run();
+    let server = HttpServer::new(move || App::new().app_data(db_pool.clone()).app_data(app_module.clone()).configure(set_route_config))
+        .bind(get_server_and_port())
+        .expect("Failed to bind server address")
+        .run();
     info!("Actix Web server configured and started successfully.");
     server
 }
@@ -75,11 +73,7 @@ pub async fn get_db_pool() -> SqlitePool {
         .unwrap_or_else(|_| DEFAULT_MAX_CONNECTIONS.into())
         .parse()
         .expect("DATABASE_MAX_CONNECTIONS must be a valid number");
-    let pool = SqlitePoolOptions::new()
-        .max_connections(max_connections)
-        .connect(&database_url)
-        .await
-        .expect("Failed to create database connection pool");
+    let pool = SqlitePoolOptions::new().max_connections(max_connections).connect(&database_url).await.expect("Failed to create database connection pool");
     info!("Database connection pool created successfully.");
     info!("  Database URL: {}", database_url);
     info!("  Max connections: {}", max_connections);

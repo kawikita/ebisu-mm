@@ -1,0 +1,15 @@
+{
+    "recommendations": [
+        "fill-labs.dependi",
+        "inferrinizzard.prettier-sql-vscode",
+        "jebbs.plantuml",
+        "mtxr.sqltools-driver-sqlite",
+        "mtxr.sqltools",
+        "redhat.vscode-yaml",
+        "rust-lang.rust-analyzer",
+        "Swellaby.vscode-rust-test-adapter",
+        "tamasfe.even-better-toml",
+        "vadimcn.vscode-lldb",
+        "yzhang.markdown-all-in-one"
+    ]
+}

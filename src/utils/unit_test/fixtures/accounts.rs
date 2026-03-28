@@ -169,19 +169,14 @@ impl AccountDao for ParametrizedMockAccountDaoImpl {
         Ok(get_sorted_account_list())
     }
 
-    async fn get_accounts_list_by_type(
-        &self,
-        _pool: &SqlitePool,
-        account_type_name: &str,
-    ) -> sqlx::Result<Vec<Account>> {
+    async fn get_accounts_list_by_type(&self, _pool: &SqlitePool, account_type_name: &str) -> sqlx::Result<Vec<Account>> {
         if self.config.error_on_get {
             return Err(sqlx::Error::RowNotFound);
         }
         if self.config.get_return_empty {
             return Ok(vec![]);
         }
-        let accounts: Vec<Account> =
-            get_account_list().into_iter().filter(|acc| acc.account_type.name == account_type_name).collect();
+        let accounts: Vec<Account> = get_account_list().into_iter().filter(|acc| acc.account_type.name == account_type_name).collect();
         Ok(accounts)
     }
 
@@ -189,9 +184,7 @@ impl AccountDao for ParametrizedMockAccountDaoImpl {
         if self.config.error_on_get {
             return Err(sqlx::Error::RowNotFound);
         }
-        if self.config.get_return_empty
-            || (self.config.get_in_create_return_empty && is_called_from_create_account(&Backtrace::new()))
-        {
+        if self.config.get_return_empty || (self.config.get_in_create_return_empty && is_called_from_create_account(&Backtrace::new())) {
             return Ok(None);
         }
         let account = get_account_list().into_iter().find(|acc| acc.id == id);
