@@ -1,8 +1,26 @@
+# Ebisu API クラス図
+
 ```plantuml
 @startuml
-' Ebisu API クラス図 (src配下)
+title Ebisu API クラス図
 
 package ebisu_api {
+  ' DAO
+  package dao {
+    package accounts {
+      interface AccountDao {
+        +get_accounts_list_all()
+        +get_accounts_list_by_type()
+        +get_account_by_id()
+        +create_account()
+        +update_account()
+        +delete_account()
+      }
+
+      class AccountDaoImpl
+      AccountDaoImpl ..|> AccountDao
+    }
+  }
   ' エンティティ
   package entity {
     package accounts {
@@ -21,24 +39,6 @@ package ebisu_api {
       }
     }
   }
-
-  ' DAO
-  package dao {
-    package accounts {
-      interface AccountDao {
-        +get_accounts_list_all()
-        +get_accounts_list_by_type()
-        +get_account_by_id()
-        +create_account()
-        +update_account()
-        +delete_account()
-      }
-
-      class AccountDaoImpl
-      AccountDaoImpl ..|> AccountDao
-    }
-  }
-
   ' Handler
   package handler {
     package accounts {
@@ -54,31 +54,10 @@ package ebisu_api {
       class AccountHandlerImpl
       AccountHandlerImpl ..|> AccountHandler
     }
+    class swagger_ui
   }
 
   package utils {
-    package unit_test {
-      package fixtures {
-        class accounts {
-          +insert_test_account()
-          +get_account_list()
-          +get_sorted_account_list()
-          +get_first_account()
-          +create_new_account()
-        }
-        class db {
-          +create_empty_db()
-          +create_test_db()
-          +db_migration()
-        }
-      }
-    }
-    note bottom: 単体テストでしか使わない
-    package test_helpers {
-      class accounts
-      class db
-    }
-    note bottom: test_helpersはunit_test::fixturesのエイリアス
     package app_setup as AppSetupModule {
       ' AppModule (DI用)
       struct AppModule {
@@ -86,7 +65,12 @@ package ebisu_api {
       }
     }
     class app_setup {
-      +set_route()
+      +get_server()
+      +get_db_pool()
+      -get_server_and_port()
+      -get_server()
+      -index()
+      -set_route()
       -set_route_config()
     }
     app_setup -> AppModule
@@ -96,6 +80,8 @@ package ebisu_api {
     }
     class logging {
       +init_logger()
+      -set_log_message_format()
+      -open_log_file()
     }
     package message as MessagePkg {
       interface MessageHierarchy {
@@ -104,10 +90,11 @@ package ebisu_api {
       }
     }
     class message {
-      -load_messages()
-      -get_messages_()
       +set_hierarchy()
       +msg_map!()
+      -load_messages()
+      -get_messages_root()
+
     }
     message -- MessageHierarchy
 
