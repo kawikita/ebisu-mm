@@ -75,6 +75,35 @@ package ebisu_api {
     }
     app_setup -> AppModule
 
+    package error {
+      ' エラーレスポンス構造
+      class ErrorResponse {
+        - error: ErrorDetail
+      }
+      class ErrorDetail {
+        - code: u16
+        - message: String
+      }
+
+      ' アプリケーションエラー型
+      class AppError {
+        + to_error_response()
+        + status_code()
+        + error_response()
+      }
+
+      ' actix_web::ResponseErrorトレイト
+      interface ResponseError {
+        + status_code()
+        + error_response()
+      }
+
+      ' 関連
+      AppError ..|> ResponseError : implements
+      AppError --> ErrorResponse : to_error_response()
+      ErrorResponse --> ErrorDetail : error
+    }
+
     class exporter {
       +export_openapi_json()
     }
@@ -119,8 +148,10 @@ package ebisu_api {
 
   ' 関連
   Account --> AccountType
-  AccountHandlerImpl --> Account
   AccountDaoImpl --> Account
+  AccountHandlerImpl --> Account
+  AccountHandlerImpl --> AppError
+  AccountHandlerImpl --> ErrorResponse
   AccountHandlerImpl --> message
 
   AppModule --> AccountHandler

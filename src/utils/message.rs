@@ -32,12 +32,12 @@ impl<'a> MessageHierarchy<'a> {
     /// * `key` - メッセージキー
     /// # Returns
     /// メッセージ文字列への参照。未定義時は空文字列への参照＋エラーログ
-    pub fn get(&self, key: &str) -> &str {
+    pub fn get(&self, key: &str) -> String {
         match self.node.get(key).and_then(|v| v.as_str()) {
-            Some(s) => s,
+            Some(s) => s.to_string(),
             None => {
                 error!("Message key '{}' not found or not a string value", key);
-                ""
+                String::from("")
             },
         }
     }
@@ -50,11 +50,11 @@ impl<'a> MessageHierarchy<'a> {
     /// フォーマット済みメッセージ文字列。失敗時は空文字＋エラーログ
     pub fn get_fmt(&self, key: &str, vars: &HashMap<String, String>) -> String {
         let template = self.get(key);
-        match strfmt(template, vars) {
+        match strfmt(&template, vars) {
             Ok(s) => s,
             Err(e) => {
                 error!("Failed to format message for key '{}': {}", key, e);
-                "".to_string()
+                String::from("")
             },
         }
     }
