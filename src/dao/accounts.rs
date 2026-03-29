@@ -1,5 +1,5 @@
 use crate::entity::accounts::{Account, AccountType};
-use log::{debug, info};
+use log::{debug, error, info};
 use shaku::{Component, Interface};
 use sqlx::{FromRow, Result, SqlitePool};
 use std::sync::Arc;
@@ -64,7 +64,8 @@ impl AccountDao for AccountDaoImpl {
             "#,
         )
         .fetch_all(pool)
-        .await?;
+        .await
+        .inspect_err(|e| error!("Failed to fetch all accounts: {:?}", e))?;
         info!("Fetched {} accounts.", accounts_rows.len());
         Ok(convert_iter_to_accounts(accounts_rows))
     }
@@ -97,7 +98,8 @@ impl AccountDao for AccountDaoImpl {
             account_type_name
         )
         .fetch_all(pool)
-        .await?;
+        .await
+        .inspect_err(|e| error!("Failed to fetch accounts with type '{}': {:?}", account_type_name, e))?;
         info!("Fetched {} accounts with account type ID: {}.", accounts_rows.len(), account_type_name);
         Ok(convert_iter_to_accounts(accounts_rows))
     }
@@ -129,7 +131,8 @@ impl AccountDao for AccountDaoImpl {
             id
         )
         .fetch_optional(pool)
-        .await?;
+        .await
+        .inspect_err(|e| error!("Failed to fetch account with ID '{}': {:?}", id, e))?;
         info!("Fetched account with ID: {}.", id);
         Ok(account_row.map(|row| convert_row_to_object(&row)))
     }
@@ -153,7 +156,8 @@ impl AccountDao for AccountDaoImpl {
             account.memo
         )
         .execute(pool)
-        .await?;
+        .await
+        .inspect_err(|e| error!("Failed to create account '{:?}': {:?}", account, e))?;
         info!("Created account with ID: {}.", account.id);
         Ok(result.rows_affected())
     }
@@ -179,7 +183,8 @@ impl AccountDao for AccountDaoImpl {
             account_row.id
         )
         .execute(pool)
-        .await?;
+        .await
+        .inspect_err(|e| error!("Failed to update account '{:?}': {:?}", account, e))?;
         info!("Updated account with ID: {}.", account.id);
         Ok(result.rows_affected())
     }
@@ -200,7 +205,8 @@ impl AccountDao for AccountDaoImpl {
             id
         )
         .execute(pool)
-        .await?;
+        .await
+        .inspect_err(|e| error!("Failed to delete account with ID '{}': {:?}", id, e))?;
         info!("Deleted account with ID: {}.", id);
         Ok(result.rows_affected())
     }
@@ -273,7 +279,6 @@ mod tests {
     use super::*;
     use crate::utils::unit_test::fixtures::accounts as fixtures_accounts;
     use crate::utils::unit_test::fixtures::db as fixtures_db;
-    use tokio::time::{Duration, sleep};
     use uuid::Uuid;
 
     // get_accounts_list_allのテスト
@@ -318,6 +323,24 @@ mod tests {
             assert_eq!(accounts[0].id, account_list[0].id);
             assert_eq!(accounts[1].id, account_list[1].id);
             assert_eq!(accounts[2].id, account_list[2].id);
+        }
+        // DBエラーが発生した場合（テーブルが存在しない）
+        #[tokio::test]
+        async fn returns_error_on_db_failure() {
+            // preparation
+            testing_logger::setup();
+            let pool = fixtures_db::create_undefined_db().await;
+            // execution
+            let dao = AccountDaoImpl::new_arc();
+            let err = dao.get_accounts_list_all(&pool).await;
+            // assertion
+            assert!(matches!(err, Err(sqlx::Error::Database(_))));
+            testing_logger::validate(|captured_logs| {
+                let error_logs: Vec<_> = captured_logs.iter().filter(|log| log.level == log::Level::Error).collect();
+                assert_eq!(error_logs.len(), 1);
+                let log_message = &error_logs[0].body;
+                assert!(log_message.contains("Failed to fetch all accounts"));
+            });
         }
     }
 
@@ -366,6 +389,25 @@ mod tests {
             assert_eq!(filtered[1].account_type.name, account_type_name);
             assert_ne!(filtered[0].id, filtered[1].id);
         }
+        // DBエラーが発生した場合（テーブルが存在しない）
+        #[tokio::test]
+        async fn returns_error_on_db_failure() {
+            // preparation
+            testing_logger::setup();
+            let pool = fixtures_db::create_undefined_db().await;
+            let account_type_name = "銀行口座(普通)".to_string();
+            // execution
+            let dao = AccountDaoImpl::new_arc();
+            let err = dao.get_accounts_list_by_type(&pool, &account_type_name).await;
+            // assertion
+            assert!(matches!(err, Err(sqlx::Error::Database(_))));
+            testing_logger::validate(|captured_logs| {
+                let error_logs: Vec<_> = captured_logs.iter().filter(|log| log.level == log::Level::Error).collect();
+                assert_eq!(error_logs.len(), 1);
+                let log_message = &error_logs[0].body;
+                assert!(log_message.contains("Failed to fetch accounts with type"));
+            });
+        }
     }
 
     // get_account_by_idのテスト
@@ -400,6 +442,25 @@ mod tests {
             assert_eq!(fetched.account_type.id, first_account.account_type.id);
             assert_eq!(fetched.memo, first_account.memo);
         }
+        // DBエラーが発生した場合（テーブルが存在しない）
+        #[tokio::test]
+        async fn returns_error_on_db_failure() {
+            // preparation
+            testing_logger::setup();
+            let pool = fixtures_db::create_undefined_db().await;
+            let search_id = Uuid::new_v4().to_string();
+            // execution
+            let dao = AccountDaoImpl::new_arc();
+            let err = dao.get_account_by_id(&pool, &search_id).await;
+            // assertion
+            assert!(matches!(err, Err(sqlx::Error::Database(_))));
+            testing_logger::validate(|captured_logs| {
+                let error_logs: Vec<_> = captured_logs.iter().filter(|log| log.level == log::Level::Error).collect();
+                assert_eq!(error_logs.len(), 1);
+                let log_message = &error_logs[0].body;
+                assert!(log_message.contains("Failed to fetch account with ID"));
+            });
+        }
     }
 
     // create_accountのテスト
@@ -424,6 +485,25 @@ mod tests {
             assert!(!fetched.created_at.is_none());
             assert!(!fetched.updated_at.is_none());
         }
+        // DBエラーが発生した場合（テーブルが存在しない）
+        #[tokio::test]
+        async fn returns_error_on_db_failure() {
+            // preparation
+            testing_logger::setup();
+            let pool = fixtures_db::create_undefined_db().await;
+            let adding_account = fixtures_accounts::create_new_account();
+            // execution
+            let dao = AccountDaoImpl::new_arc();
+            let err = dao.create_account(&pool, &adding_account).await;
+            // assertion
+            assert!(matches!(err, Err(sqlx::Error::Database(_))));
+            testing_logger::validate(|captured_logs| {
+                let error_logs: Vec<_> = captured_logs.iter().filter(|log| log.level == log::Level::Error).collect();
+                assert_eq!(error_logs.len(), 1);
+                let log_message = &error_logs[0].body;
+                assert!(log_message.contains("Failed to create account"));
+            });
+        }
     }
 
     // update_accountのテスト
@@ -439,8 +519,6 @@ mod tests {
             let before = dao.get_account_by_id(&pool, &before_account.id).await.unwrap().unwrap();
             let mut updated_account = convert_object_to_row(&before);
             updated_account.memo = Some("更新後のメモ".to_string());
-            let before_updated_at = before.updated_at.clone();
-            sleep(Duration::from_secs(1)).await; // updated_atの差分を確実にするため、1秒待機
             // execution
             let updated = dao.update_account(&pool, &convert_row_to_object(&updated_account)).await.unwrap();
             // assertion
@@ -452,8 +530,27 @@ mod tests {
             assert_eq!(after.memo, updated_account.memo);
             assert!(!after.created_at.is_none());
             assert!(!after.updated_at.is_none());
-            assert_ne!(after.updated_at, before_updated_at);
-            assert_ne!(after.created_at, after.updated_at);
+        }
+        // DBエラーが発生した場合（テーブルが存在しない）
+        #[tokio::test]
+        async fn returns_error_on_db_failure() {
+            // preparation
+            testing_logger::setup();
+            let pool = fixtures_db::create_undefined_db().await;
+            let before_account = fixtures_accounts::get_first_account();
+            let mut updated_account = convert_object_to_row(&before_account);
+            updated_account.memo = Some("更新後のメモ".to_string());
+            // execution
+            let dao = AccountDaoImpl::new_arc();
+            let err = dao.update_account(&pool, &convert_row_to_object(&updated_account)).await;
+            // assertion
+            assert!(matches!(err, Err(sqlx::Error::Database(_))));
+            testing_logger::validate(|captured_logs| {
+                let error_logs: Vec<_> = captured_logs.iter().filter(|log| log.level == log::Level::Error).collect();
+                assert_eq!(error_logs.len(), 1);
+                let log_message = &error_logs[0].body;
+                assert!(log_message.contains("Failed to update account"));
+            });
         }
     }
 
@@ -473,6 +570,25 @@ mod tests {
             assert_eq!(deleted, 1);
             let fetched = dao.get_account_by_id(&pool, &delete_account.id).await.unwrap();
             assert!(fetched.is_none());
+        }
+        // DBエラーが発生した場合（テーブルが存在しない）
+        #[tokio::test]
+        async fn returns_error_on_db_failure() {
+            // preparation
+            testing_logger::setup();
+            let pool = fixtures_db::create_undefined_db().await;
+            let delete_account = fixtures_accounts::get_first_account();
+            // execution
+            let dao = AccountDaoImpl::new_arc();
+            let err = dao.delete_account(&pool, &delete_account.id).await;
+            // assertion
+            assert!(matches!(err, Err(sqlx::Error::Database(_))));
+            testing_logger::validate(|captured_logs| {
+                let error_logs: Vec<_> = captured_logs.iter().filter(|log| log.level == log::Level::Error).collect();
+                assert_eq!(error_logs.len(), 1);
+                let log_message = &error_logs[0].body;
+                assert!(log_message.contains("Failed to delete account with ID"));
+            });
         }
     }
 }

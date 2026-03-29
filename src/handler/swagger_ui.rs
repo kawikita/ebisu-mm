@@ -1,10 +1,15 @@
 use crate::entity;
 use crate::handler;
+use crate::utils;
 use actix_web::{HttpResponse, get, web};
 use log::debug;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+const BUILD_NUMBER: &str = match option_env!("BUILD_NUMBER") {
+    Some(v) => v,
+    None => "0",
+};
 const API_BASE_PATH: &str = "/api/docs/{_:.*}";
 
 /// Swagger UIのルート設定関数
@@ -38,6 +43,8 @@ pub async fn openapi_json() -> Result<HttpResponse, actix_web::Error> {
         schemas(
             entity::accounts::Account,
             entity::accounts::AccountType,
+            utils::error::ErrorResponse,
+            utils::error::ErrorDetail,
         )
     ),
     tags(
@@ -45,7 +52,7 @@ pub async fn openapi_json() -> Result<HttpResponse, actix_web::Error> {
     ),
     info(
         title = "Ebisu API",
-        version = "1.0.0",
+        version = concat!(env!("CARGO_PKG_VERSION"), ".", env!("BUILD_NUMBER")),
         description = "API documentation for the Ebisu application",
         contact(
             name = "Samurai QA Laboratory",

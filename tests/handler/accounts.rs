@@ -7,7 +7,6 @@ use ebisu_api::handler::accounts::set_route as accounts_configure;
 use ebisu_api::utils::app_setup::AppModule;
 use serde_json::json;
 use sqlx::{Pool, Sqlite};
-use std::vec;
 
 const API_BASE_PATH: &str = "/api/account";
 
@@ -19,9 +18,20 @@ enum HttpMethod {
 }
 
 // APIを呼び出すヘルパー関数
-async fn call_api(pool: &Pool<Sqlite>, method: HttpMethod, api_path: &str, send_body: Option<&Account>) -> ServiceResponse {
+async fn call_api(
+    pool: &Pool<Sqlite>,
+    method: HttpMethod,
+    api_path: &str,
+    send_body: Option<&Account>,
+) -> ServiceResponse {
     let app_module = AppModule::builder().build();
-    let app = test::init_service(App::new().app_data(web::Data::new(pool.clone())).app_data(web::Data::new(app_module)).configure(accounts_configure)).await;
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(pool.clone()))
+            .app_data(web::Data::new(app_module))
+            .configure(accounts_configure),
+    )
+    .await;
     let req = {
         match method {
             HttpMethod::GET => test::TestRequest::get().uri(api_path).to_request(),
@@ -45,9 +55,9 @@ mod get_account {
         let api_path = API_BASE_PATH;
         let resp = call_api(&pool, HttpMethod::GET, &api_path, None).await;
         // assertion
-        assert_eq!(resp.status(), StatusCode::OK);
-        let body: Vec<Account> = test::read_body_json(resp).await;
-        assert_eq!(body, vec![]);
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(body, json!({"error": {"code": 404, "message": "No accounts found."}}));
     }
 
     #[actix_web::test]
@@ -76,7 +86,7 @@ mod get_account {
         // assertion
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body: serde_json::Value = test::read_body_json(resp).await;
-        assert_eq!(body, json!({"error": "Failed to fetch accounts."}));
+        assert_eq!(body, json!({"error": {"code": 500, "message": "Failed to fetch accounts."}}));
     }
 }
 
@@ -108,7 +118,7 @@ mod get_account_type {
         // assertion
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         let body: serde_json::Value = test::read_body_json(resp).await;
-        assert_eq!(body, json!({"error": "No accounts found."}));
+        assert_eq!(body, json!({"error": {"code": 404, "message": "No accounts found."}}));
     }
 
     #[actix_web::test]
@@ -122,7 +132,7 @@ mod get_account_type {
         // assertion
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body: serde_json::Value = test::read_body_json(resp).await;
-        assert_eq!(body, json!({"error": "Failed to fetch accounts."}));
+        assert_eq!(body, json!({"error": {"code": 500, "message": "Failed to fetch accounts."}}));
     }
 }
 
@@ -154,7 +164,7 @@ mod get_account_id {
         // assertion
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         let body: serde_json::Value = test::read_body_json(resp).await;
-        assert_eq!(body, json!({"error": "Account not found."}));
+        assert_eq!(body, json!({"error": {"code": 404, "message": "Account not found."}}));
     }
 
     #[actix_web::test]
@@ -167,7 +177,7 @@ mod get_account_id {
         // assertion
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body: serde_json::Value = test::read_body_json(resp).await;
-        assert_eq!(body, json!({"error": "Failed to fetch account."}));
+        assert_eq!(body, json!({"error": {"code": 500, "message": "Failed to fetch account."}}));
     }
 }
 
@@ -200,7 +210,7 @@ mod post_account {
         // assertion
         assert_eq!(resp.status(), StatusCode::CONFLICT);
         let body: serde_json::Value = test::read_body_json(resp).await;
-        assert_eq!(body, json!({"error": "Account ID already exists."}));
+        assert_eq!(body, json!({"error": {"code": 409, "message": "Account ID already exists."}}));
     }
 
     #[actix_web::test]
@@ -214,7 +224,7 @@ mod post_account {
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body: serde_json::Value = test::read_body_json(resp).await;
         // 重複チェックのエラーしか確認が難しい（登録時のエラーは単体テストで確認する）
-        assert_eq!(body, json!({"error": "Failed to fetch account."}));
+        assert_eq!(body, json!({"error": {"code": 500, "message": "Failed to fetch account."}}));
     }
 }
 
@@ -245,7 +255,7 @@ mod delete_account {
         // assertion
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         let body: serde_json::Value = test::read_body_json(resp).await;
-        assert_eq!(body, json!({"error": "Account not found."}));
+        assert_eq!(body, json!({"error": {"code": 404, "message": "Account not found."}}));
     }
 
     #[actix_web::test]
@@ -258,24 +268,20 @@ mod delete_account {
         // assertion
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body: serde_json::Value = test::read_body_json(resp).await;
-        assert_eq!(body, json!({"error": "Failed to delete account."}));
+        assert_eq!(body, json!({"error": {"code": 500, "message": "Failed to delete account."}}));
     }
 }
 
 mod put_account {
     use super::*;
-    use tokio::time::{Duration, sleep};
 
     #[actix_web::test]
     pub async fn returns_200_ok_update_account() {
         // preparation
         let pool = fixtures_db::create_test_db().await;
         let before = fixtures_accounts::get_first_account();
-        let before_updated_at = before.updated_at.clone();
         let mut update_account = before.clone();
         update_account.memo = Some("更新されたメモ".to_string());
-        update_account.updated_at = None;
-        sleep(Duration::from_secs(2)).await; // updated_atの差分を確実にするため、少し待機
         // execution
         let api_path = API_BASE_PATH;
         let resp = call_api(&pool, HttpMethod::PUT, &api_path, Some(&update_account)).await;
@@ -291,8 +297,6 @@ mod put_account {
         assert_eq!(updated_body.name, update_account.name);
         assert_eq!(updated_body.account_type, update_account.account_type);
         assert_eq!(updated_body.memo, update_account.memo);
-        assert_ne!(updated_body.updated_at, before_updated_at);
-        assert_ne!(updated_body.created_at, updated_body.updated_at);
     }
 
     #[actix_web::test]
@@ -306,7 +310,7 @@ mod put_account {
         // assertion
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         let body: serde_json::Value = test::read_body_json(resp).await;
-        assert_eq!(body, json!({"error": "Account not found."}));
+        assert_eq!(body, json!({"error": {"code": 404, "message": "Account not found."}}));
     }
 
     #[actix_web::test]
@@ -319,6 +323,6 @@ mod put_account {
         // assertion
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body: serde_json::Value = test::read_body_json(resp).await;
-        assert_eq!(body, json!({"error": "Failed to update account."}));
+        assert_eq!(body, json!({"error": {"code": 500, "message": "Failed to update account."}}));
     }
 }

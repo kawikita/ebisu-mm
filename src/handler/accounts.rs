@@ -1,9 +1,11 @@
 use crate::dao::accounts::AccountDao;
 use crate::entity::accounts::Account;
+use crate::handler::HandlerResult;
 use crate::utils::app_setup::AppModule;
+use crate::utils::error::{AppError, ErrorResponse};
 use crate::utils::message::{MessageHierarchy, set_hierarchy};
-use actix_web::{HttpResponse, Result, web};
-use log::{error, info};
+use actix_web::{HttpResponse, web};
+use log::info;
 use once_cell::sync::Lazy;
 use serde_json::json;
 use shaku::{Component, HasComponent, Interface};
@@ -28,7 +30,11 @@ pub fn set_route(cfg: &mut web::ServiceConfig) {
                     .route(web::post().to(create_account_handler))
                     .route(web::put().to(update_account_handler)),
             )
-            .service(web::resource("/{id}").route(web::get().to(get_account_by_id_handler)).route(web::delete().to(delete_account_handler)))
+            .service(
+                web::resource("/{id}")
+                    .route(web::get().to(get_account_by_id_handler))
+                    .route(web::delete().to(delete_account_handler)),
+            )
             .service(web::resource("/type/{type_name}").route(web::get().to(get_accounts_list_by_type_handler))),
     );
 }
@@ -37,19 +43,15 @@ pub fn set_route(cfg: &mut web::ServiceConfig) {
 
 #[utoipa::path(post, path = "/api/account", tag = "accounts", request_body = Account, responses(
     (status = 201, description = "Account created successfully", body = serde_json::Value, example = json!({"created": 1})),
-    (status = 409, description = "Account ID already exists", body = serde_json::Value, example = json!({"error": MESSAGE.get("account_id_already_exists")})),
-    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_create_account")})),
+    (status = 409, description = "Account ID already exists", body = ErrorResponse, example = json!(AppError::Conflict(MESSAGE.get("account_id_already_exists")).to_error_response())),
+    (status = 500, description = "Internal server error", body = ErrorResponse, example = json!(AppError::InternalServerError(MESSAGE.get("failed_to_create_account")).to_error_response())),
 ))]
 /// 新しい口座情報を作成するAPI
 /// # Arguments
 /// * `pool` - Sqliteのコネクションプール
 /// * `app_module` - アプリケーションのDIコンテナ
 /// * `data` - リクエストボディから取得した口座情報
-pub async fn create_account_handler(
-    pool: web::Data<SqlitePool>,
-    app_module: web::Data<AppModule>,
-    data: web::Json<Account>,
-) -> Result<HttpResponse, actix_web::Error> {
+pub async fn create_account_handler(pool: web::Data<SqlitePool>, app_module: web::Data<AppModule>, data: web::Json<Account>) -> HandlerResult {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
     handler.create_account(pool, data).await
 }
@@ -58,8 +60,8 @@ pub async fn create_account_handler(
     ("id" = String, Path, description = "Account ID(UUID)")
 ), responses(
     (status = 204, description = "Account deleted successfully"),
-    (status = 404, description = "Account not found", body = serde_json::Value, example = json!({"error": MESSAGE.get("account_not_found")})),
-    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_delete_account")})),
+    (status = 404, description = "Account not found", body = ErrorResponse, example = json!(AppError::NotFound(MESSAGE.get("account_not_found")).to_error_response())),
+    (status = 500, description = "Internal server error", body = ErrorResponse, example = json!(AppError::InternalServerError(MESSAGE.get("failed_to_delete_account")).to_error_response())),
 ))]
 /// 指定されたIDの口座情報を削除するAPI
 /// # Arguments
@@ -68,11 +70,7 @@ pub async fn create_account_handler(
 /// * `path` - リクエストパスから取得した口座ID
 /// # Returns
 /// 成功時はHTTP 204、失敗時はHTTP 500とエラーメッセージを返す
-pub async fn delete_account_handler(
-    pool: web::Data<SqlitePool>,
-    app_module: web::Data<AppModule>,
-    path: web::Path<String>,
-) -> Result<HttpResponse, actix_web::Error> {
+pub async fn delete_account_handler(pool: web::Data<SqlitePool>, app_module: web::Data<AppModule>, path: web::Path<String>) -> HandlerResult {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
     handler.delete_account(pool, path).await
 }
@@ -81,8 +79,8 @@ pub async fn delete_account_handler(
     ("id" = String, Path, description = "Account ID(UUID)")
 ), responses(
     (status = 200, description = "Account fetched successfully", body = Account),
-    (status = 404, description = "Account not found", body = serde_json::Value, example = json!({"error": MESSAGE.get("account_not_found")})),
-    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_fetch_account")})),
+    (status = 404, description = "Account not found", body = ErrorResponse, example = json!(AppError::NotFound(MESSAGE.get("account_not_found")).to_error_response())),
+    (status = 500, description = "Internal server error", body = ErrorResponse, example = json!(AppError::InternalServerError(MESSAGE.get("failed_to_fetch_account")).to_error_response())),
 ))]
 /// 指定されたIDの口座情報を取得するAPI
 /// # Arguments
@@ -91,18 +89,15 @@ pub async fn delete_account_handler(
 /// * `path` - リクエストパスから取得した口座ID
 /// # Returns
 /// 成功時はHTTP 200、失敗時はHTTP 500とエラーメッセージを返す
-pub async fn get_account_by_id_handler(
-    pool: web::Data<SqlitePool>,
-    app_module: web::Data<AppModule>,
-    path: web::Path<String>,
-) -> Result<HttpResponse, actix_web::Error> {
+pub async fn get_account_by_id_handler(pool: web::Data<SqlitePool>, app_module: web::Data<AppModule>, path: web::Path<String>) -> HandlerResult {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
     handler.get_account_by_id(pool, path).await
 }
 
 #[utoipa::path(get, path = "/api/account", tag = "accounts", responses(
     (status = 200, description = "Accounts fetched successfully", body = [Account]),
-    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_fetch_accounts")}))
+    (status = 404, description = "Account not found", body = ErrorResponse, example = json!(AppError::NotFound(MESSAGE.get("account_not_found")).to_error_response())),
+    (status = 500, description = "Internal server error", body = ErrorResponse, example = json!(AppError::InternalServerError(MESSAGE.get("failed_to_fetch_accounts")).to_error_response()))
 ))]
 /// 全ての口座情報を取得するAPI
 /// # Arguments
@@ -110,7 +105,7 @@ pub async fn get_account_by_id_handler(
 /// * `app_module` - アプリケーションのDIコンテナ
 /// # Returns
 /// 成功時はHTTP 200、失敗時はHTTP 500とエラーメッセージを返す
-pub async fn get_accounts_list_all_handler(pool: web::Data<SqlitePool>, app_module: web::Data<AppModule>) -> Result<HttpResponse, actix_web::Error> {
+pub async fn get_accounts_list_all_handler(pool: web::Data<SqlitePool>, app_module: web::Data<AppModule>) -> HandlerResult {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
     handler.get_accounts_list_all(pool).await
 }
@@ -119,8 +114,8 @@ pub async fn get_accounts_list_all_handler(pool: web::Data<SqlitePool>, app_modu
     ("type_name" = String, Path, description = "Account Type Name")
 ), responses(
     (status = 200, description = "Accounts fetched successfully", body = [Account]),
-    (status = 404, description = "No accounts found", body = serde_json::Value, example = json!({"error": MESSAGE.get("no_accounts_found")})),
-    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_fetch_accounts")})),
+    (status = 404, description = "No accounts found", body = ErrorResponse, example = json!(AppError::NotFound(MESSAGE.get("no_accounts_found")).to_error_response())),
+    (status = 500, description = "Internal server error", body = ErrorResponse, example = json!(AppError::InternalServerError(MESSAGE.get("failed_to_fetch_accounts")).to_error_response())),
 ))]
 /// 指定された口座種別の口座情報を取得するAPI
 /// # Arguments
@@ -129,19 +124,15 @@ pub async fn get_accounts_list_all_handler(pool: web::Data<SqlitePool>, app_modu
 /// * `path` - リクエストパスから取得した口座種別名
 /// # Returns
 /// 成功時はHTTP 200、失敗時はHTTP 500とエラーメッセージを返す
-pub async fn get_accounts_list_by_type_handler(
-    pool: web::Data<SqlitePool>,
-    app_module: web::Data<AppModule>,
-    path: web::Path<String>,
-) -> Result<HttpResponse, actix_web::Error> {
+pub async fn get_accounts_list_by_type_handler(pool: web::Data<SqlitePool>, app_module: web::Data<AppModule>, path: web::Path<String>) -> HandlerResult {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
     handler.get_accounts_list_by_type(pool, path).await
 }
 
 #[utoipa::path(put, path = "/api/account", tag = "accounts", request_body = Account, responses(
     (status = 200, description = "Account updated successfully", body = serde_json::Value, example = json!({"updated": 1})),
-    (status = 404, description = "Account not found", body = serde_json::Value, example = json!({"error": MESSAGE.get("account_not_found")})),
-    (status = 500, description = "Internal server error", body = serde_json::Value, example = json!({"error": MESSAGE.get("failed_to_update_account")})),
+    (status = 404, description = "Account not found", body = ErrorResponse, example = json!(AppError::NotFound(MESSAGE.get("account_not_found")).to_error_response())),
+    (status = 500, description = "Internal server error", body = ErrorResponse, example = json!(AppError::InternalServerError(MESSAGE.get("failed_to_update_account")).to_error_response())),
 ))]
 /// 指定されたIDの口座情報を更新するAPI
 /// # Arguments
@@ -150,11 +141,7 @@ pub async fn get_accounts_list_by_type_handler(
 /// * `data` - リクエストボディから取得した口座情報
 /// # Returns
 /// 成功時はHTTP 200、失敗時はHTTP 500とエラーメッセージを返す
-pub async fn update_account_handler(
-    pool: web::Data<SqlitePool>,
-    app_module: web::Data<AppModule>,
-    data: web::Json<Account>,
-) -> Result<HttpResponse, actix_web::Error> {
+pub async fn update_account_handler(pool: web::Data<SqlitePool>, app_module: web::Data<AppModule>, data: web::Json<Account>) -> HandlerResult {
     let handler: Arc<dyn AccountHandler> = app_module.resolve();
     handler.update_account(pool, data).await
 }
@@ -162,12 +149,12 @@ pub async fn update_account_handler(
 /// 口座情報ハンドラーのインターフェース
 #[async_trait::async_trait]
 pub trait AccountHandler: Interface {
-    async fn create_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> Result<HttpResponse, actix_web::Error>;
-    async fn delete_account(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> Result<HttpResponse, actix_web::Error>;
-    async fn get_account_by_id(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> Result<HttpResponse, actix_web::Error>;
-    async fn get_accounts_list_all(&self, pool: web::Data<SqlitePool>) -> Result<HttpResponse, actix_web::Error>;
-    async fn get_accounts_list_by_type(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> Result<HttpResponse, actix_web::Error>;
-    async fn update_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> Result<HttpResponse, actix_web::Error>;
+    async fn create_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> HandlerResult;
+    async fn delete_account(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> HandlerResult;
+    async fn get_account_by_id(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> HandlerResult;
+    async fn get_accounts_list_all(&self, pool: web::Data<SqlitePool>) -> HandlerResult;
+    async fn get_accounts_list_by_type(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> HandlerResult;
+    async fn update_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> HandlerResult;
 }
 
 /// 口座情報ハンドラーの実装
@@ -188,35 +175,40 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `data` - リクエストボディから取得した新しい口座情報
     /// # Returns
     /// 成功時はHTTP 201と作成件数、失敗時はHTTP 500とエラーメッセージ
-    async fn create_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> Result<HttpResponse, actix_web::Error> {
+    async fn create_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> HandlerResult {
         info!("Received request to create a new account");
         let account_id = data.id.clone();
         // IDの重複チェック
-        let result = self.account_dao.get_account_by_id(&pool, &account_id).await;
-        match result {
-            Ok(account) => {
-                if account.is_some() {
-                    info!("Account with ID {} already exists.", account_id);
-                    return Ok(HttpResponse::Conflict().json(json!({"error": MESSAGE.get("account_id_already_exists")})));
-                }
-            },
-            Err(e) => {
-                error!("Database error: {:?}", e);
-                return Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_fetch_account")})));
-            },
+        let account_body =
+            self.account_dao
+                .get_account_by_id(&pool, &account_id)
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "Failed to fetch account by ID {}: {:?}",
+                        account_id,
+                        e
+                    );
+                    AppError::InternalServerError(MESSAGE.get("failed_to_fetch_account"))
+                })?;
+        if account_body.is_some() {
+            info!("Account with ID {} already exists.", account_id);
+            return Err(AppError::Conflict(MESSAGE.get("account_id_already_exists")));
         }
-        // 口座の作成
-        let result = self.account_dao.create_account(&pool, &data).await;
-        match result {
-            Ok(success_count) => {
-                info!("Created {} new account(s).", success_count);
-                Ok(HttpResponse::Created().json(json!({"created": success_count})))
-            },
-            Err(e) => {
-                error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_create_account")})))
-            },
-        }
+        let success_count =
+            self.account_dao
+                .create_account(&pool, &data)
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "Failed to create account with ID {}: {:?}",
+                        account_id,
+                        e
+                    );
+                    AppError::InternalServerError(MESSAGE.get("failed_to_create_account"))
+                })?;
+        info!("Created {} new account(s).", success_count);
+        Ok(HttpResponse::Created().json(json!({"created": success_count})))
     }
 
     /// 指定されたIDの口座情報を削除するハンドラー関数
@@ -225,24 +217,17 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `path` - URLパスから取得した口座ID
     /// # Returns
     /// 成功時はHTTP 200と成功メッセージ、失敗時はHTTP 500とエラーメッセージ
-    async fn delete_account(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
+    async fn delete_account(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> HandlerResult {
         let account_id = path.as_str();
         info!("Received request to delete account by ID: {}", account_id);
-        let result = self.account_dao.delete_account(&pool, account_id).await;
-        match result {
-            Ok(del_count) => {
-                if del_count == 0 {
-                    info!("No account found with ID: {}", account_id);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": MESSAGE.get("account_not_found")})));
-                }
-                info!("Deleted account with ID: {}", account_id);
-                Ok(HttpResponse::NoContent().finish())
-            },
-            Err(e) => {
-                error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_delete_account")})))
-            },
+        let del_count =
+            self.account_dao.delete_account(&pool, account_id).await.map_err(|_| AppError::InternalServerError(MESSAGE.get("failed_to_delete_account")))?;
+        if del_count == 0 {
+            info!("No account found with ID: {}", account_id);
+            return Err(AppError::NotFound(MESSAGE.get("account_not_found")));
         }
+        info!("Deleted account with ID: {}", account_id);
+        Ok(HttpResponse::NoContent().finish())
     }
 
     /// 指定されたIDの口座情報を取得するハンドラー関数
@@ -251,23 +236,20 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `path` - URLパスから取得した口座ID
     /// # Returns
     /// 成功時はHTTP 200と口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
-    async fn get_account_by_id(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
+    async fn get_account_by_id(&self, pool: web::Data<SqlitePool>, path: web::Path<String>) -> HandlerResult {
         let account_id = path.as_str();
         info!("Received request to fetch account by ID: {}", account_id);
-        let result = self.account_dao.get_account_by_id(&pool, account_id).await;
-        match result {
-            Ok(account) => {
-                if account.is_none() {
-                    info!("No account found with ID: {}", account_id);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": MESSAGE.get("account_not_found")})));
-                }
+        let account_body =
+            self.account_dao.get_account_by_id(&pool, account_id).await.map_err(|_| AppError::InternalServerError(MESSAGE.get("failed_to_fetch_account")))?;
+        match account_body {
+            Some(account) => {
                 info!("Fetched account with ID: {}", account_id);
                 Ok(HttpResponse::Ok().json(account))
-            },
-            Err(e) => {
-                error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_fetch_account")})))
-            },
+            }
+            None => {
+                info!("No account found with ID: {}", account_id);
+                Err(AppError::NotFound(MESSAGE.get("account_not_found")))
+            }
         }
     }
 
@@ -276,19 +258,16 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `pool` - データベース接続プール
     /// # Returns
     /// 成功時はHTTP 200と口座情報のJSON配列、失敗時はHTTP 500とエラーメッセージ
-    async fn get_accounts_list_all(&self, pool: web::Data<SqlitePool>) -> Result<HttpResponse, actix_web::Error> {
+    /// 全ての口座情報が1件も存在しない場合はHTTP 404とエラーメッセージを返す
+    async fn get_accounts_list_all(&self, pool: web::Data<SqlitePool>) -> HandlerResult {
         info!("Received request to fetch all accounts");
-        let result = self.account_dao.get_accounts_list_all(&pool).await;
-        match result {
-            Ok(accounts) => {
-                info!("Fetched {} accounts.", accounts.len());
-                Ok(HttpResponse::Ok().json(accounts))
-            },
-            Err(e) => {
-                error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_fetch_accounts")})))
-            },
+        let account_list =
+            self.account_dao.get_accounts_list_all(&pool).await.map_err(|_| AppError::InternalServerError(MESSAGE.get("failed_to_fetch_accounts")))?;
+        if account_list.is_empty() {
+            return Err(AppError::NotFound(MESSAGE.get("no_accounts_found")));
         }
+        info!("Fetched {} accounts.", account_list.len());
+        Ok(HttpResponse::Ok().json(account_list))
     }
 
     /// 指定された口座種別の口座情報を取得するハンドラー関数
@@ -297,23 +276,19 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `type_name` - URLパスから取得した口座種別名
     /// # Returns
     /// 成功時はHTTP 200と口座情報のJSON配列、失敗時はHTTP 500とエラーメッセージ
-    async fn get_accounts_list_by_type(&self, pool: web::Data<SqlitePool>, type_name: web::Path<String>) -> Result<HttpResponse, actix_web::Error> {
+    /// 指定された口座種別の口座情報が1件も存在しない場合はHTTP 404とエラーメッセージを返す
+    async fn get_accounts_list_by_type(&self, pool: web::Data<SqlitePool>, type_name: web::Path<String>) -> HandlerResult {
         info!("Received request to fetch accounts of type: {}", type_name);
-        let result = self.account_dao.get_accounts_list_by_type(&pool, &type_name).await;
-        match result {
-            Ok(accounts) => {
-                if accounts.is_empty() {
-                    info!("No accounts found for type: {}", type_name);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": MESSAGE.get("no_accounts_found")})));
-                }
-                info!("Fetched {} accounts of type: {}", accounts.len(), type_name);
-                Ok(HttpResponse::Ok().json(accounts))
-            },
-            Err(e) => {
-                error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_fetch_accounts")})))
-            },
+        let account_list = self
+            .account_dao
+            .get_accounts_list_by_type(&pool, &type_name)
+            .await
+            .map_err(|_| AppError::InternalServerError(MESSAGE.get("failed_to_fetch_accounts")))?;
+        if account_list.is_empty() {
+            return Err(AppError::NotFound(MESSAGE.get("no_accounts_found")));
         }
+        info!("Fetched {} accounts of type: {}", account_list.len(), type_name);
+        Ok(HttpResponse::Ok().json(account_list))
     }
 
     /// 指定されたIDの口座情報を更新するハンドラー関数
@@ -323,23 +298,15 @@ impl AccountHandler for AccountHandlerImpl {
     /// * `data` - リクエストボディから取得した更新後の口座情報
     /// # 戻り値
     /// 成功時はHTTP 200と更新された口座情報のJSON、失敗時はHTTP 500とエラーメッセージ
-    async fn update_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> Result<HttpResponse, actix_web::Error> {
+    async fn update_account(&self, pool: web::Data<SqlitePool>, data: web::Json<Account>) -> HandlerResult {
         info!("Received request to update account by ID: {}", data.id);
-        let result = self.account_dao.update_account(&pool, &data).await;
-        match result {
-            Ok(updated_count) => {
-                if updated_count == 0 {
-                    info!("No account found with ID: {}", data.id);
-                    return Ok(HttpResponse::NotFound().json(json!({"error": MESSAGE.get("account_not_found")})));
-                }
-                info!("Updated account with ID: {}", data.id);
-                Ok(HttpResponse::Ok().json(json!({"updated": updated_count})))
-            },
-            Err(e) => {
-                error!("Database error: {:?}", e);
-                Ok(HttpResponse::InternalServerError().json(json!({"error": MESSAGE.get("failed_to_update_account")})))
-            },
+        let update = self.account_dao.update_account(&pool, &data).await.map_err(|_| AppError::InternalServerError(MESSAGE.get("failed_to_update_account")))?;
+
+        if update == 0 {
+            return Err(AppError::NotFound(MESSAGE.get("account_not_found")));
         }
+        info!("Updated account with ID: {}", data.id);
+        Ok(HttpResponse::Ok().json(json!({"updated": update})))
     }
 }
 
@@ -457,12 +424,14 @@ mod tests {
             let existing_account = fixtures_accounts::get_first_account();
             let existing_account_json = web::Json(existing_account.clone());
             // execution
-            let resp = _handler.create_account(pool, existing_account_json).await.unwrap();
+            let resp = _handler.create_account(pool, existing_account_json).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::CONFLICT);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "Account ID already exists."}));
+            match resp {
+                AppError::Conflict(message) => {
+                    assert_eq!(message, "Account ID already exists.");
+                },
+                _ => panic!("Expected Conflict error"),
+            }
         }
 
         #[tokio::test]
@@ -472,12 +441,14 @@ mod tests {
             let new_account = fixtures_accounts::get_first_account();
             let new_account_json = web::Json(new_account.clone());
             // execution
-            let resp = _handler.create_account(pool, new_account_json).await.unwrap();
+            let resp = _handler.create_account(pool, new_account_json).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "Failed to fetch account."}));
+            match resp {
+                AppError::InternalServerError(message) => {
+                    assert_eq!(message, "Failed to fetch account.");
+                },
+                _ => panic!("Expected InternalServerError error"),
+            }
         }
 
         // TODO: モックを使えるようになってから
@@ -488,12 +459,14 @@ mod tests {
             let new_account = fixtures_accounts::get_first_account();
             let new_account_json = web::Json(new_account.clone());
             // execution
-            let resp = _handler.create_account(pool, new_account_json).await.unwrap();
+            let resp = _handler.create_account(pool, new_account_json).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "Failed to create account."}));
+            match resp {
+                AppError::InternalServerError(message) => {
+                    assert_eq!(message, "Failed to create account.");
+                },
+                _ => panic!("Expected InternalServerError error"),
+            }
         }
     }
 
@@ -505,12 +478,14 @@ mod tests {
             // preparation
             let (pool, _handler) = setup(get_empty_params()).await;
             // execution
-            let resp = _handler.get_accounts_list_all(pool).await.unwrap();
+            let resp = _handler.get_accounts_list_all(pool).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::OK);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let accounts: Vec<Account> = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(accounts.len(), 0);
+            match resp {
+                AppError::NotFound(message) => {
+                    assert_eq!(message, "No accounts found.");
+                },
+                _ => panic!("Expected NotFound error"),
+            }
         }
 
         #[tokio::test]
@@ -535,12 +510,14 @@ mod tests {
             // preparation
             let (pool, _handler) = setup(get_error_params()).await;
             // execution
-            let resp = _handler.get_accounts_list_all(pool).await.unwrap();
+            let resp = _handler.get_accounts_list_all(pool).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "Failed to fetch accounts."}));
+            match resp {
+                AppError::InternalServerError(message) => {
+                    assert_eq!(message, "Failed to fetch accounts.");
+                },
+                _ => panic!("Expected InternalServerError error"),
+            }
         }
     }
 
@@ -553,12 +530,14 @@ mod tests {
             let (pool, _handler) = setup(get_empty_params()).await;
             let path = web::Path::from("Other".to_string());
             // execution
-            let resp = _handler.get_accounts_list_by_type(pool, path).await.unwrap();
+            let resp = _handler.get_accounts_list_by_type(pool, path).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "No accounts found."}));
+            match resp {
+                AppError::NotFound(message) => {
+                    assert_eq!(message, "No accounts found.");
+                },
+                _ => panic!("Expected NotFound error"),
+            }
         }
 
         #[tokio::test]
@@ -584,12 +563,14 @@ mod tests {
             let account = fixtures_accounts::get_first_account();
             let path = web::Path::from(account.account_type.name.clone());
             // execution
-            let resp = _handler.get_accounts_list_by_type(pool, path).await.unwrap();
+            let resp = _handler.get_accounts_list_by_type(pool, path).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "Failed to fetch accounts."}));
+            match resp {
+                AppError::InternalServerError(message) => {
+                    assert_eq!(message, "Failed to fetch accounts.");
+                },
+                _ => panic!("Expected InternalServerError error"),
+            }
         }
     }
 
@@ -602,12 +583,14 @@ mod tests {
             let (pool, _handler) = setup(get_empty_params()).await;
             let path = web::Path::from("nonexistent_id".to_string());
             // execution
-            let resp = _handler.get_account_by_id(pool, path).await.unwrap();
+            let resp = _handler.get_account_by_id(pool, path).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "Account not found."}));
+            match resp {
+                AppError::NotFound(message) => {
+                    assert_eq!(message, "Account not found.");
+                },
+                _ => panic!("Expected NotFound error"),
+            }
         }
 
         #[tokio::test]
@@ -631,12 +614,14 @@ mod tests {
             let (pool, _handler) = setup(get_error_params()).await;
             let path = web::Path::from("any_id".to_string());
             // execution
-            let resp = _handler.get_account_by_id(pool, path).await.unwrap();
+            let resp = _handler.get_account_by_id(pool, path).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "Failed to fetch account."}));
+            match resp {
+                AppError::InternalServerError(message) => {
+                    assert_eq!(message, "Failed to fetch account.");
+                },
+                _ => panic!("Expected InternalServerError error"),
+            }
         }
     }
 
@@ -649,12 +634,14 @@ mod tests {
             let (pool, _handler) = setup(get_empty_params()).await;
             let path = web::Path::from("nonexistent_id".to_string());
             // execution
-            let resp = _handler.delete_account(pool, path).await.unwrap();
+            let resp = _handler.delete_account(pool, path).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "Account not found."}));
+            match resp {
+                AppError::NotFound(message) => {
+                    assert_eq!(message, "Account not found.");
+                },
+                _ => panic!("Expected NotFound error"),
+            }
         }
 
         #[tokio::test]
@@ -675,12 +662,14 @@ mod tests {
             let (pool, _handler) = setup(get_error_params()).await;
             let path = web::Path::from("any_id".to_string());
             // execution
-            let resp = _handler.delete_account(pool, path).await.unwrap();
+            let resp = _handler.delete_account(pool, path).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "Failed to delete account."}));
+            match resp {
+                AppError::InternalServerError(message) => {
+                    assert_eq!(message, "Failed to delete account.");
+                },
+                _ => panic!("Expected InternalServerError error"),
+            }
         }
     }
 
@@ -694,12 +683,14 @@ mod tests {
             let account = fixtures_accounts::create_new_account();
             let account_json = web::Json(account);
             // execution
-            let resp = _handler.update_account(pool, account_json).await.unwrap();
+            let resp = _handler.update_account(pool, account_json).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "Account not found."}));
+            match resp {
+                AppError::NotFound(message) => {
+                    assert_eq!(message, "Account not found.");
+                },
+                _ => panic!("Expected NotFound error"),
+            }
         }
 
         #[tokio::test]
@@ -725,12 +716,14 @@ mod tests {
             let account = fixtures_accounts::get_first_account();
             let account_json = web::Json(account);
             // execution
-            let resp = _handler.update_account(pool, account_json).await.unwrap();
+            let resp = _handler.update_account(pool, account_json).await.unwrap_err();
             // assertion
-            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
-            let body_bytes = to_bytes(resp.into_body()).await.unwrap();
-            let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-            assert_eq!(body, json!({"error": "Failed to update account."}));
+            match resp {
+                AppError::InternalServerError(message) => {
+                    assert_eq!(message, "Failed to update account.");
+                },
+                _ => panic!("Expected InternalServerError error"),
+            }
         }
     }
 }
